@@ -405,7 +405,11 @@ const Map<CodeShortcutType, List<ShortcutActivator>> _kDefaultMacCodeShortcutsAc
     SingleActivator(LogicalKeyboardKey.enter),
     SingleActivator(LogicalKeyboardKey.enter, shift: true),
     SingleActivator(LogicalKeyboardKey.enter, meta: true),
-    SingleActivator(LogicalKeyboardKey.enter, meta: true, shift: true)
+    SingleActivator(LogicalKeyboardKey.enter, meta: true, shift: true),
+    SingleActivator(LogicalKeyboardKey.numpadEnter),
+    SingleActivator(LogicalKeyboardKey.numpadEnter, shift: true),
+    SingleActivator(LogicalKeyboardKey.numpadEnter, meta: true),
+    SingleActivator(LogicalKeyboardKey.numpadEnter, meta: true, shift: true)
   ],
   CodeShortcutType.transposeCharacters: [
     SingleActivator(LogicalKeyboardKey.keyT, control: true)
@@ -565,7 +569,11 @@ const Map<CodeShortcutType, List<ShortcutActivator>> _kDefaultCommonCodeShortcut
     SingleActivator(LogicalKeyboardKey.enter),
     SingleActivator(LogicalKeyboardKey.enter, shift: true),
     SingleActivator(LogicalKeyboardKey.enter, control: true),
-    SingleActivator(LogicalKeyboardKey.enter, control: true, shift: true)
+    SingleActivator(LogicalKeyboardKey.enter, control: true, shift: true),
+    SingleActivator(LogicalKeyboardKey.numpadEnter),
+    SingleActivator(LogicalKeyboardKey.numpadEnter, shift: true),
+    SingleActivator(LogicalKeyboardKey.numpadEnter, control: true),
+    SingleActivator(LogicalKeyboardKey.numpadEnter, control: true, shift: true)
   ],
   CodeShortcutType.transposeCharacters: [
     SingleActivator(LogicalKeyboardKey.keyT, control: true)
