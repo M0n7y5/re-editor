@@ -320,6 +320,8 @@ class _CodeInputController extends ChangeNotifier implements DeltaTextInputClien
   void insertContent(KeyboardInsertedContent content) {
   }
 
+  bool onFocusReceived() => false;
+
   void ensureInput() {
     if (_focusNode.hasFocus) {
       if (!_readOnly) {
