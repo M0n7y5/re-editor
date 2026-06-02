@@ -460,11 +460,13 @@ class _CodeEditorState extends State<CodeEditor> {
       _editingController.bindEditor(_editorKey);
     }
     if (oldWidget.findController != widget.findController || oldWidget.controller != widget.controller) {
+      final CodeFindController oldFindController = _findController;
       if (oldWidget.findController == null) {
-        _findController.dispose();
+        oldFindController.dispose();
+      } else {
+        oldFindController.removeListener(_updateWidget);
       }
       _findController = widget.findController ?? CodeFindController(_editingController);
-      _findController.removeListener(_updateWidget);
       _findController.addListener(_updateWidget);
     }
     if (oldWidget.scrollController != widget.scrollController) {
