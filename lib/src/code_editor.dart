@@ -17,6 +17,7 @@ class CodeEditorStyle {
     this.cursorColor,
     this.cursorWidth,
     this.cursorLineColor,
+    this.bracketMatchColor,
     this.chunkIndicatorColor,
     this.codeTheme,
   }) : assert(fontSize == null || fontSize > 0),
@@ -141,6 +142,9 @@ class CodeEditorStyle {
 
   /// The color to use as the border for the focused line.
   final Color? cursorLineColor;
+
+  /// The color of the matching-bracket highlight border.
+  final Color? bracketMatchColor;
 
   /// The color of the chunked indicator at the end of the line.
   final Color? chunkIndicatorColor;
@@ -519,6 +523,7 @@ class _CodeEditorState extends State<CodeEditor> {
       highlightColor: widget.style?.highlightColor ?? selectionTheme.selectionColor ?? theme.colorScheme.primary.withOpacity(0.4),
       cursorColor:  widget.style?.cursorColor ?? selectionTheme.cursorColor ?? theme.colorScheme.primary,
       cursorLineColor: widget.style?.cursorLineColor,
+      bracketMatchColor: widget.style?.bracketMatchColor,
       chunkIndicatorColor: widget.style?.chunkIndicatorColor,
       cursorWidth: widget.style?.cursorWidth ?? _kDefaultCaretWidth,
       showCursorWhenReadOnly: widget.showCursorWhenReadOnly ?? true,

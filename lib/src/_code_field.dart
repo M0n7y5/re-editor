@@ -8,6 +8,8 @@ class _CodeField extends SingleChildRenderObjectWidget {
   final double horizontalScrollbarHeight;
   final CodeLines codes;
   final CodeLineSelection selection;
+  final List<CodeLineSelection> carets;
+  final List<CodeLineSelection> matchedBrackets;
   final List<CodeLineSelection>? highlightSelections;
   final TextStyle textStyle;
   final bool hasFocus;
@@ -20,6 +22,7 @@ class _CodeField extends SingleChildRenderObjectWidget {
   final Color cursorColor;
   final Color floatingCursorColor;
   final Color? cursorLineColor;
+  final Color? bracketMatchColor;
   final Color? chunkIndicatorColor;
   final double cursorWidth;
   final double floatingCursorWidth;
@@ -37,6 +40,8 @@ class _CodeField extends SingleChildRenderObjectWidget {
     required this.horizontalScrollbarHeight,
     required this.codes,
     required this.selection,
+    required this.carets,
+    required this.matchedBrackets,
     required this.highlightSelections,
     required this.textStyle,
     required this.hasFocus,
@@ -49,6 +54,7 @@ class _CodeField extends SingleChildRenderObjectWidget {
     required this.cursorColor,
     floatingCursorColor,
     this.cursorLineColor,
+    this.bracketMatchColor,
     this.chunkIndicatorColor,
     required this.cursorWidth,
     floatingCursorWidth,
@@ -70,6 +76,8 @@ class _CodeField extends SingleChildRenderObjectWidget {
     horizontalScrollbarHeight: horizontalScrollbarHeight,
     codes: codes,
     selection: selection,
+    carets: carets,
+    matchedBrackets: matchedBrackets,
     highlightSelections: highlightSelections,
     textStyle: textStyle,
     hasFocus: hasFocus,
@@ -82,6 +90,7 @@ class _CodeField extends SingleChildRenderObjectWidget {
     cursorColor: cursorColor,
     floatingCursorColor: floatingCursorColor,
     cursorLineColor: cursorLineColor,
+    bracketMatchColor: bracketMatchColor,
     chunkIndicatorColor: chunkIndicatorColor,
     cursorWidth: cursorWidth,
     floatingCursorWidth: floatingCursorWidth,
@@ -101,6 +110,8 @@ class _CodeField extends SingleChildRenderObjectWidget {
       ..horizontalScrollbarHeight = horizontalScrollbarHeight
       ..codes = codes
       ..selection = selection
+      ..carets = carets
+      ..matchedBrackets = matchedBrackets
       ..highlightSelections = highlightSelections
       ..textStyle = textStyle
       ..hasFocus = hasFocus
@@ -113,6 +124,7 @@ class _CodeField extends SingleChildRenderObjectWidget {
       ..cursorColor = cursorColor
       ..floatingCursorColor = floatingCursorColor
       ..cursorLineColor = cursorLineColor
+      ..bracketMatchColor = bracketMatchColor
       ..chunkIndicatorColor = chunkIndicatorColor
       ..cursorWidth = cursorWidth
       ..floatingCursorWidth = floatingCursorWidth
@@ -135,6 +147,8 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
   double _horizontalScrollbarHeight;
   CodeLines _codes;
   CodeLineSelection _selection;
+  List<CodeLineSelection> _carets;
+  List<CodeLineSelection> _matchedBrackets;
   TextStyle _textStyle;
   bool _hasFocus;
   _CodeHighlighter _highlighter;
@@ -164,6 +178,8 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
     required double horizontalScrollbarHeight,
     required CodeLines codes,
     required CodeLineSelection selection,
+    required List<CodeLineSelection> carets,
+    required List<CodeLineSelection> matchedBrackets,
     required List<CodeLineSelection>? highlightSelections,
     required TextStyle textStyle,
     required bool hasFocus,
@@ -176,6 +192,7 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
     required Color cursorColor,
     required Color floatingCursorColor,
     Color? cursorLineColor,
+    Color? bracketMatchColor,
     Color? chunkIndicatorColor,
     required double cursorWidth,
     required double floatingCursorWidth,
@@ -190,6 +207,8 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
     _horizontalScrollbarHeight = horizontalScrollbarHeight,
     _codes = codes,
     _selection = selection,
+    _carets = carets,
+    _matchedBrackets = matchedBrackets,
     _textStyle = textStyle,
     _hasFocus = hasFocus,
     _highlighter = highlighter,
@@ -210,14 +229,15 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
       painters: [
         _CodeCursorLinePainter(cursorLineColor, _selection),
         _CodeFieldSelectionPainter(selectionColor, _selection),
-        _CodeFieldHighlightPainter(highlightColor, highlightSelections ?? const [])
+        _CodeFieldHighlightPainter(highlightColor, highlightSelections ?? const []),
+        _CodeBracketMatchPainter(bracketMatchColor, matchedBrackets)
       ]
     );
     adoptChild(_backgroundRender);
     _foregroundRender = _CodeFieldExtraRender(
       painters: [
         _CodeFieldCursorPainter(
-          position: _selection.extent,
+          positions: _carets.map((CodeLineSelection s) => s.extent).toList(),
           color: cursorColor,
           width: cursorWidth,
           height: 0.0,
@@ -293,8 +313,6 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
     }
     _selection = value;
     _backgroundRender.find<_CodeCursorLinePainter>().selection = value;
-    _backgroundRender.find<_CodeFieldSelectionPainter>().selection = value;
-    _foregroundRender.find<_CodeFieldCursorPainter>().position = value.extent;
     if (kIsAndroid || kIsIOS) {
       _foregroundRender.find<_CodeFieldCursorPainter>().willDraw = _selection.isCollapsed;
     }
@@ -303,6 +321,25 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
 
   set highlightSelections(List<CodeLineSelection>? value) {
     _backgroundRender.find<_CodeFieldHighlightPainter>().selections = value ?? const [];
+  }
+
+  set carets(List<CodeLineSelection> value) {
+    if (listEquals(_carets, value)) {
+      return;
+    }
+    _carets = value;
+    _backgroundRender.find<_CodeFieldSelectionPainter>().selections = value;
+    _foregroundRender.find<_CodeFieldCursorPainter>().positions =
+        value.map((CodeLineSelection s) => s.extent).toList();
+    markNeedsLayout();
+  }
+
+  set matchedBrackets(List<CodeLineSelection> value) {
+    if (listEquals(_matchedBrackets, value)) {
+      return;
+    }
+    _matchedBrackets = value;
+    _backgroundRender.find<_CodeBracketMatchPainter>().brackets = value;
   }
 
   set textStyle(TextStyle value) {
@@ -398,6 +435,10 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
 
   set cursorLineColor(Color? value) {
     _backgroundRender.find<_CodeCursorLinePainter>().color = value;
+  }
+
+  set bracketMatchColor(Color? value) {
+    _backgroundRender.find<_CodeBracketMatchPainter>().color = value;
   }
 
   set chunkIndicatorColor(Color? value) {
@@ -1444,6 +1485,68 @@ class _CodeCursorLinePainter extends _CodeFieldExtraPainter {
 
 }
 
+class _CodeBracketMatchPainter extends _CodeFieldExtraPainter {
+
+  final Paint _paint;
+  Color? _color;
+  List<CodeLineSelection> _brackets;
+
+  _CodeBracketMatchPainter(this._color, this._brackets) : _paint = Paint() {
+    _paint
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1;
+  }
+
+  set color(Color? value) {
+    if (_color == value) {
+      return;
+    }
+    _color = value;
+    notifyListeners();
+  }
+
+  set brackets(List<CodeLineSelection> value) {
+    if (listEquals(_brackets, value)) {
+      return;
+    }
+    _brackets = value;
+    notifyListeners();
+  }
+
+  @override
+  void paint(Canvas canvas, Size size, _CodeFieldRender render) {
+    if (_color == null || _color == Colors.transparent) {
+      return;
+    }
+    if (_brackets.isEmpty) {
+      return;
+    }
+    _paint.color = _color!;
+    for (final CodeLineSelection bracket in _brackets) {
+      final CodeLineRenderParagraph? paragraph = render.findDisplayParagraphByLineIndex(bracket.startIndex);
+      if (paragraph == null) {
+        continue;
+      }
+      Offset? start = paragraph.getOffset(bracket.start);
+      Offset? end = paragraph.getOffset(bracket.end);
+      if (start == null || end == null) {
+        continue;
+      }
+      final Offset delta = paragraph.offset - render.paintOffset;
+      start += delta;
+      end += delta;
+      if (start.dy + paragraph.preferredLineHeight < 0 || start.dy >= size.height) {
+        continue;
+      }
+      canvas.drawRect(
+        Rect.fromLTRB(start.dx, start.dy, end.dx, start.dy + paragraph.preferredLineHeight),
+        _paint,
+      );
+    }
+  }
+
+}
+
 abstract class _CodeFieldSelectionsPainter extends _CodeFieldExtraPainter {
 
   static const Offset _newLinePadding = Offset(5.0, 0.0);
@@ -1559,7 +1662,7 @@ class _CodeFieldHighlightPainter extends _CodeFieldSelectionsPainter {
 class _CodeFieldCursorPainter extends _CodeFieldExtraPainter {
 
   final Paint _paint;
-  CodeLinePosition _position;
+  List<CodeLinePosition> _positions;
   Color _color;
   double _width;
   double _height;
@@ -1567,12 +1670,12 @@ class _CodeFieldCursorPainter extends _CodeFieldExtraPainter {
   bool _willDraw;
 
   _CodeFieldCursorPainter({
-    required CodeLinePosition position,
+    required List<CodeLinePosition> positions,
     required Color color,
     required double width,
     required double height,
     required bool visible,
-  }) : _position = position,
+  }) : _positions = positions,
     _color = color,
     _width = width,
     _height = height,
@@ -1580,11 +1683,11 @@ class _CodeFieldCursorPainter extends _CodeFieldExtraPainter {
     _willDraw = true,
     _paint = Paint();
 
-  set position(CodeLinePosition value) {
-    if (_position == value) {
+  set positions(List<CodeLinePosition> value) {
+    if (listEquals(_positions, value)) {
       return;
     }
-    _position = value;
+    _positions = value;
     notifyListeners();
   }
 
@@ -1635,19 +1738,21 @@ class _CodeFieldCursorPainter extends _CodeFieldExtraPainter {
     if (!_visible || !_willDraw || _color == Colors.transparent || _color.alpha == 0) {
       return;
     }
-    final CodeLineRenderParagraph? paragraph = render.findDisplayParagraphByLineIndex(_position.index);
-    if (paragraph == null) {
-      return;
+    for (final CodeLinePosition position in _positions) {
+      final CodeLineRenderParagraph? paragraph = render.findDisplayParagraphByLineIndex(position.index);
+      if (paragraph == null) {
+        continue;
+      }
+      Offset? offset = paragraph.getOffset(position);
+      if (offset == null) {
+        continue;
+      }
+      offset += paragraph.offset - render.paintOffset;
+      if (offset.dx + _width < 0 || offset.dx >= size.width || offset.dy + _height < 0 || offset.dy >= size.height) {
+        continue;
+      }
+      _drawCaret(canvas, offset, size);
     }
-    Offset? offset = paragraph.getOffset(_position);
-    if (offset == null) {
-      return;
-    }
-    offset += paragraph.offset - render.paintOffset;
-    if (offset.dx + _width < 0 || offset.dx >= size.width || offset.dy + _height < 0 || offset.dy >= size.height) {
-      return;
-    }
-    _drawCaret(canvas, offset, size);
   }
 
   void _drawCaret(Canvas canvas, Offset offset, Size size) {

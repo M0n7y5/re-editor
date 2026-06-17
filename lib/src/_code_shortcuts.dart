@@ -155,6 +155,14 @@ class _CodeShortcutActions extends StatelessWidget {
         actions.editingController.moveSelectionLinesDown();
       }
     },
+    ShortcutLineDuplicateIntent: (intent, actions) {
+      if ((intent as ShortcutLineDuplicateIntent).direction ==
+          VerticalDirection.up) {
+        actions.editingController.duplicateSelectionLinesUp();
+      } else {
+        actions.editingController.duplicateSelectionLinesDown();
+      }
+    },
     CodeShortcutIndentIntent: (intent, actions) {
       actions.editingController.applyIndent();
     },
@@ -250,6 +258,16 @@ class _CodeShortcutActions extends StatelessWidget {
     CodeShortcutTransposeCharactersIntent: (intent, actions) {
       actions.editingController.transposeCharacters();
     },
+    CodeShortcutAddCaretNextOccurrenceIntent: (intent, actions) {
+      actions.editingController.addSelectionFromNextOccurrence();
+    },
+    CodeShortcutAddCaretIntent: (intent, actions) {
+      actions.editingController.addCaretVertically(
+          above: (intent as CodeShortcutAddCaretIntent).above);
+    },
+    CodeShortcutSelectAllOccurrencesIntent: (intent, actions) {
+      actions.editingController.selectAllOccurrences();
+    },
     CodeShortcutFindIntent: (intent, actions) {
       actions.findController?.findMode();
     },
@@ -263,6 +281,10 @@ class _CodeShortcutActions extends StatelessWidget {
       actions.findController?.replaceMode();
     },
     CodeShortcutEscIntent: (intent, actions) {
+      if (actions.editingController.selections.length > 1) {
+        actions.editingController.clearSecondarySelections();
+        return;
+      }
       if (actions.findController?.value != null) {
         actions.findController?.close();
       } else {
@@ -329,6 +351,6 @@ class _EscCallbackAction<T extends Intent> extends CallbackAction<T> {
   @override
   bool isEnabled(T intent) {
     return !controller.isComposing &&
-        (findController?.value != null || !controller.selection.isCollapsed);
+        (findController?.value != null || !controller.selection.isCollapsed || controller.selections.length > 1);
   }
 }

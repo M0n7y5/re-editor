@@ -67,7 +67,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   @override
   set selection(CodeLineSelection newSelection) {
     value = value.copyWith(
-      selection: newSelection
+      selection: newSelection,
+      extraSelections: const <CodeLineSelection>[],
     );
   }
 
@@ -317,6 +318,124 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   }
 
   @override
+  List<CodeLineSelection> get selections => <CodeLineSelection>[...value.extraSelections, value.selection];
+
+  @override
+  void addSelection(CodeLineSelection selection) {
+    if (selection == value.selection) {
+      return;
+    }
+    for (final CodeLineSelection s in value.extraSelections) {
+      if (s == selection) {
+        return;
+      }
+    }
+    value = value.copyWith(
+      extraSelections: <CodeLineSelection>[...value.extraSelections, value.selection],
+      selection: selection,
+    );
+    makeCursorVisible();
+  }
+
+  @override
+  void clearSecondarySelections() {
+    if (value.extraSelections.isEmpty) {
+      return;
+    }
+    value = value.copyWith(extraSelections: const <CodeLineSelection>[]);
+  }
+
+  @override
+  void addSelectionFromNextOccurrence() {
+    if (selection.isCollapsed) {
+      final CodeLineSelection? word = _wordRangeAt(selection.extentIndex, selection.extentOffset);
+      if (word == null) {
+        return;
+      }
+      value = value.copyWith(selection: word);
+      return;
+    }
+    final String doc = text;
+    final int lo = _flatOffsetOf(selection.startIndex, selection.startOffset).clamp(0, doc.length);
+    final int hi = _flatOffsetOf(selection.endIndex, selection.endOffset).clamp(0, doc.length);
+    if (hi <= lo) {
+      return;
+    }
+    final String needle = doc.substring(lo, hi);
+    if (needle.contains('\n')) {
+      return;
+    }
+    int from = hi;
+    for (final CodeLineSelection s in selections) {
+      final int end = _flatOffsetOf(s.endIndex, s.endOffset);
+      if (end > from) {
+        from = end;
+      }
+    }
+    int idx = doc.indexOf(needle, from);
+    if (idx < 0) {
+      idx = doc.indexOf(needle);
+    }
+    if (idx < 0) {
+      return;
+    }
+    final CodeLineSelection next = _selectionFromFlat(idx, idx + needle.length);
+    for (final CodeLineSelection s in selections) {
+      if (s == next) {
+        return;
+      }
+    }
+    addSelection(next);
+  }
+
+  @override
+  void selectAllOccurrences() {
+    CodeLineSelection primary = selection;
+    final String needle;
+    if (primary.isCollapsed) {
+      final CodeLineSelection? word = _wordRangeAt(primary.extentIndex, primary.extentOffset);
+      if (word == null) {
+        return;
+      }
+      primary = word;
+      needle = _selectionText(word);
+    } else {
+      needle = _selectionText(primary);
+    }
+    if (needle.isEmpty) {
+      return;
+    }
+    final String doc = text;
+    final int primFlat = _flatOffsetOf(primary.startIndex, primary.startOffset);
+    final List<CodeLineSelection> carets = <CodeLineSelection>[];
+    CodeLineSelection? newPrimary;
+    int i = doc.indexOf(needle);
+    while (i >= 0) {
+      final CodeLineSelection match = _selectionFromFlat(i, i + needle.length);
+      if (i == primFlat) {
+        newPrimary = match;
+      } else {
+        carets.add(match);
+      }
+      i = doc.indexOf(needle, i + needle.length);
+    }
+    newPrimary ??= carets.isNotEmpty ? carets.removeAt(0) : primary;
+    value = value.copyWith(selection: newPrimary, extraSelections: carets);
+    makeCursorVisible();
+  }
+
+  @override
+  void addCaretVertically({required bool above}) {
+    final CodeLinePosition p = selection.extent;
+    final int targetIndex = above ? p.index - 1 : p.index + 1;
+    if (targetIndex < 0 || targetIndex >= codeLines.length) {
+      return;
+    }
+    final int targetOffset = min(p.offset, codeLines[targetIndex].length);
+    addSelection(CodeLineSelection.collapsed(index: targetIndex, offset: targetOffset));
+  }
+
+  @override
   void moveSelectionLinesUp() {
     runRevocableOp(_moveSelectionLinesUp);
   }
@@ -327,7 +446,20 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   }
 
   @override
+  void duplicateSelectionLinesUp() {
+    runRevocableOp(_duplicateSelectionLinesUp);
+  }
+
+  @override
+  void duplicateSelectionLinesDown() {
+    runRevocableOp(_duplicateSelectionLinesDown);
+  }
+
+  @override
   void moveCursor(AxisDirection direction) {
+    if (!_multiCaretActive && _runForAllCarets(() => moveCursor(direction), revocable: false)) {
+      return;
+    }
     switch (direction) {
       case AxisDirection.left:
         if (!selection.isCollapsed) {
@@ -437,6 +569,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void moveCursorToLineStart() {
+    if (!_multiCaretActive && _runForAllCarets(moveCursorToLineStart, revocable: false)) {
+      return;
+    }
     final String current = extentLine.text;
     final int prefixWhitespaceCount = _prefixWhitespaceCount(current);
     final int offset;
@@ -458,6 +593,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void moveCursorToLineEnd() {
+    if (!_multiCaretActive && _runForAllCarets(moveCursorToLineEnd, revocable: false)) {
+      return;
+    }
     selection = CodeLineSelection.collapsed(
       index: selection.extentIndex,
       offset: extentLine.length
@@ -495,6 +633,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void moveCursorToWordBoundaryBackward() {
+    if (!_multiCaretActive && _runForAllCarets(moveCursorToWordBoundaryBackward, revocable: false)) {
+      return;
+    }
     if (selection.extentOffset == 0) {
       final int newIndex = selection.extentIndex - 1;
 
@@ -555,6 +696,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void moveCursorToWordBoundaryForward() {
+    if (!_multiCaretActive && _runForAllCarets(moveCursorToWordBoundaryForward, revocable: false)) {
+      return;
+    }
     if (selection.extentOffset == extentLine.text.length) {
       final int newIndex = selection.extentIndex + 1;
 
@@ -609,6 +753,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void extendSelection(AxisDirection direction) {
+    if (!_multiCaretActive && _runForAllCarets(() => extendSelection(direction), revocable: false)) {
+      return;
+    }
     switch (direction) {
       case AxisDirection.left:
         if (selection.extentIndex != 0 || selection.extentOffset != 0) {
@@ -700,6 +847,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void extendSelectionToLineStart() {
+    if (!_multiCaretActive && _runForAllCarets(extendSelectionToLineStart, revocable: false)) {
+      return;
+    }
     selection = selection.copyWith(
       extentOffset: 0
     );
@@ -708,6 +858,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void extendSelectionToLineEnd() {
+    if (!_multiCaretActive && _runForAllCarets(extendSelectionToLineEnd, revocable: false)) {
+      return;
+    }
     selection = selection.copyWith(
       extentIndex: selection.extentIndex,
       extentOffset: extentLine.length
@@ -735,6 +888,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void extendSelectionToWordBoundaryForward() {
+    if (!_multiCaretActive && _runForAllCarets(extendSelectionToWordBoundaryForward, revocable: false)) {
+      return;
+    }
     if (selection.extentOffset == 0) {
       final int newIndex = selection.extentIndex - 1;
 
@@ -795,6 +951,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void extendSelectionToWordBoundaryBackward() {
+    if (!_multiCaretActive && _runForAllCarets(extendSelectionToWordBoundaryBackward, revocable: false)) {
+      return;
+    }
     if (selection.extentOffset == extentLine.text.length) {
       final int newIndex = selection.extentIndex + 1;
 
@@ -849,11 +1008,17 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void deleteLineForward() {
+    if (!_multiCaretActive && _runForAllCarets(deleteLineForward, revocable: true)) {
+      return;
+    }
     runRevocableOp(_deleteLineForward);
   }
 
   @override
   void deleteLineBackward() {
+    if (!_multiCaretActive && _runForAllCarets(deleteLineBackward, revocable: true)) {
+      return;
+    }
     runRevocableOp(_deleteLineBackward);
   }
 
@@ -866,51 +1031,81 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void deleteSelection() {
+    if (!_multiCaretActive && _runForAllCarets(deleteSelection, revocable: true)) {
+      return;
+    }
     runRevocableOp(_deleteSelection);
   }
 
   @override
   void deleteBackward() {
+    if (!_multiCaretActive && _runForAllCarets(deleteBackward, revocable: true)) {
+      return;
+    }
     runRevocableOp(_deleteBackward);
   }
 
   @override
   void deleteForward() {
+    if (!_multiCaretActive && _runForAllCarets(deleteForward, revocable: true)) {
+      return;
+    }
     runRevocableOp(_deleteForward);
   }
 
   @override
   void deleteWordBackward() {
+    if (!_multiCaretActive && _runForAllCarets(deleteWordBackward, revocable: true)) {
+      return;
+    }
     runRevocableOp(_deleteWordBackward);
   }
 
   @override
   void deleteWordForward() {
+    if (!_multiCaretActive && _runForAllCarets(deleteWordForward, revocable: true)) {
+      return;
+    }
     runRevocableOp(_deleteWordForward);
   }
 
   @override
   void applyNewLine() {
+    if (!_multiCaretActive && _runForAllCarets(applyNewLine, revocable: true)) {
+      return;
+    }
     runRevocableOp(_applyNewLine);
   }
 
   @override
   void applyIndent() {
+    if (!_multiCaretActive && _runForAllCarets(applyIndent, revocable: true)) {
+      return;
+    }
     runRevocableOp(_applyIndent);
   }
 
   @override
   void applyOutdent() {
+    if (!_multiCaretActive && _runForAllCarets(applyOutdent, revocable: true)) {
+      return;
+    }
     runRevocableOp(_applyOutdent);
   }
 
   @override
   void transposeCharacters() {
+    if (!_multiCaretActive && _runForAllCarets(transposeCharacters, revocable: true)) {
+      return;
+    }
     runRevocableOp(_transposeCharacters);
   }
 
   @override
   void replaceSelection(String replacement, [CodeLineSelection? range]) {
+    if (range == null && !_multiCaretActive && _runForAllCarets(() => replaceSelection(replacement), revocable: true)) {
+      return;
+    }
     runRevocableOp(() {
       _replaceRange(replacement, range);
     });
@@ -931,15 +1126,39 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   Future<void> copy() {
-    if (selection.isCollapsed) {
-      return Clipboard.setData(ClipboardData(text: extentLine.text + lineBreak.value));
-    } else {
-      return Clipboard.setData(ClipboardData(text: selectedText));
+    final List<CodeLineSelection> all = selections;
+    if (all.length <= 1) {
+      if (selection.isCollapsed) {
+        return Clipboard.setData(ClipboardData(text: extentLine.text + lineBreak.value));
+      } else {
+        return Clipboard.setData(ClipboardData(text: selectedText));
+      }
     }
+    final List<CodeLineSelection> ordered = _mergeCarets(all);
+    final StringBuffer sb = StringBuffer();
+    for (int i = 0; i < ordered.length; i++) {
+      final CodeLineSelection s = ordered[i];
+      if (s.isCollapsed) {
+        sb.write(codeLines[s.startIndex].text);
+      } else {
+        sb.write(_selectionText(s));
+      }
+      if (i < ordered.length - 1) {
+        sb.write('\n');
+      }
+    }
+    return Clipboard.setData(ClipboardData(text: sb.toString()));
   }
 
   @override
   void cut() {
+    final List<CodeLineSelection> all = selections;
+    if (all.length > 1 && all.every((CodeLineSelection s) => !s.isCollapsed)) {
+      copy();
+      deleteSelection();
+      return;
+    }
+    clearSecondarySelections();
     copy();
     if (selection.isCollapsed) {
       deleteSelectionLines(true);
@@ -951,11 +1170,21 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   @override
   void paste() {
     Clipboard.getData(Clipboard.kTextPlain).then((data) {
-      final String? text = data?.text;
-      if (text == null || text.isEmpty) {
+      final String? clip = data?.text;
+      if (clip == null || clip.isEmpty) {
         return;
       }
-      replaceSelection(text);
+      final List<CodeLineSelection> all = selections;
+      if (all.length <= 1) {
+        replaceSelection(clip);
+        return;
+      }
+      final List<String> lines = clip.split('\n');
+      final bool distribute = lines.length == all.length;
+      _forEachCaret(
+        (int i) => _replaceRange(distribute ? lines[i] : clip, null),
+        revocable: true,
+      );
     });
   }
 
@@ -1109,8 +1338,214 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     _render?.forceRepaint();
   }
 
+  // ---- Multi-cursor support ----
+
+  /// True while [_runForAllCarets] is looping. Routed ops then run their raw
+  /// single-caret body on the current primary instead of re-dispatching, and
+  /// [runRevocableOp] becomes a pass-through so the whole pass is one undo node.
+  bool _multiCaretActive = false;
+
+  /// Flat character offset of (line [index], [offset]) in the whole document,
+  /// counting one line break per line. Mirrors the loop in [_replaceAll].
+  int _flatOffsetOf(int index, int offset) {
+    int o = 0;
+    for (int i = 0; i < index; i++) {
+      o += codeLines[i].charCount + lineBreak.value.length;
+    }
+    return o + offset;
+  }
+
+  /// Inverse of [_flatOffsetOf]: maps a flat offset to (lineIndex, offsetInLine).
+  (int, int) _indexOffsetOfFlat(int target) {
+    int start = 0;
+    final int n = codeLines.length;
+    for (int i = 0; i < n; i++) {
+      final int end = start + codeLines[i].charCount + lineBreak.value.length;
+      if (target < end || i == n - 1) {
+        return (i, (target - start).clamp(0, codeLines[i].charCount));
+      }
+      start = end;
+    }
+    return (n - 1, 0);
+  }
+
+  /// Total document length in the same per-line convention as [_flatOffsetOf],
+  /// so a before/after difference is the exact net character change of an edit.
+  int get _documentCharLength {
+    int len = 0;
+    final int n = codeLines.length;
+    for (int i = 0; i < n; i++) {
+      len += codeLines[i].charCount + lineBreak.value.length;
+    }
+    return len;
+  }
+
+  CodeLineSelection _selectionFromFlat(int baseFlat, int extentFlat) {
+    final (int, int) b = _indexOffsetOfFlat(baseFlat);
+    final (int, int) e = _indexOffsetOfFlat(extentFlat);
+    return CodeLineSelection(
+      baseIndex: b.$1,
+      baseOffset: b.$2,
+      extentIndex: e.$1,
+      extentOffset: e.$2,
+    );
+  }
+
+  /// The word range (alphanumeric run) at (line [index], [offset]), or null if
+  /// the position is not adjacent to a word character.
+  CodeLineSelection? _wordRangeAt(int index, int offset) {
+    final String line = codeLines[index].text;
+    if (line.isEmpty) {
+      return null;
+    }
+    int start = offset.clamp(0, line.length);
+    int end = start;
+    while (end < line.length && _isAlphanumeric(line.codeUnitAt(end))) {
+      end++;
+    }
+    while (start > 0 && _isAlphanumeric(line.codeUnitAt(start - 1))) {
+      start--;
+    }
+    if (start == end) {
+      return null;
+    }
+    return CodeLineSelection(
+      baseIndex: index,
+      baseOffset: start,
+      extentIndex: index,
+      extentOffset: end,
+    );
+  }
+
+  /// Merge overlapping/duplicate carets; returns at least one, sorted ascending.
+  List<CodeLineSelection> _mergeCarets(List<CodeLineSelection> carets) {
+    if (carets.length <= 1) {
+      return carets;
+    }
+    final List<CodeLineSelection> sorted = [...carets]..sort((a, b) {
+      if (a.startIndex != b.startIndex) {
+        return a.startIndex - b.startIndex;
+      }
+      return a.startOffset - b.startOffset;
+    });
+    final List<CodeLineSelection> result = <CodeLineSelection>[sorted.first];
+    for (int i = 1; i < sorted.length; i++) {
+      final CodeLineSelection cur = sorted[i];
+      final CodeLineSelection prev = result.last;
+      if (prev == cur || prev.contains(cur)) {
+        continue;
+      }
+      if (_flatOffsetOf(prev.endIndex, prev.endOffset) >= _flatOffsetOf(cur.startIndex, cur.startOffset)) {
+        result[result.length - 1] = CodeLineSelection(
+          baseIndex: prev.startIndex,
+          baseOffset: prev.startOffset,
+          extentIndex: cur.endIndex,
+          extentOffset: cur.endOffset,
+        );
+      } else {
+        result.add(cur);
+      }
+    }
+    return result;
+  }
+
+  /// Run a routed single-caret [reenter] op once per caret.
+  ///
+  /// Returns true if multi-caret handling took place (caller must stop), false
+  /// if the caller should run its normal single-caret body. Each caret is
+  /// converted to a flat offset and shifted by the running length-delta of all
+  /// earlier (lower) edits, so one op never invalidates a later caret. When
+  /// [revocable] the whole pass is one [runRevocableOp] (single undo node).
+  bool _runForAllCarets(VoidCallback reenter, {required bool revocable}) {
+    if (_multiCaretActive) {
+      return false;
+    }
+    if (selections.length <= 1) {
+      return false;
+    }
+    _forEachCaret((_) => reenter(), revocable: revocable);
+    return true;
+  }
+
+  /// Core multi-caret loop shared by [_runForAllCarets] and [paste].
+  ///
+  /// Converts every caret in [selections] to a flat offset, sorts ascending,
+  /// and runs [op] once per caret (passing the ascending order index) with the
+  /// caret restored as the primary selection and shifted by the running
+  /// length-delta of all earlier edits. Results are merged and committed as the
+  /// new caret set. When [revocable] the whole pass is one undo node.
+  void _forEachCaret(void Function(int orderedIndex) op, {required bool revocable}) {
+    final List<CodeLineSelection> all = selections;
+    final int primaryIdx = all.length - 1;
+    final List<({int baseFlat, int extentFlat, bool isPrimary})> entries = [];
+    for (int i = 0; i < all.length; i++) {
+      final CodeLineSelection s = all[i];
+      entries.add((
+        baseFlat: _flatOffsetOf(s.baseIndex, s.baseOffset),
+        extentFlat: _flatOffsetOf(s.extentIndex, s.extentOffset),
+        isPrimary: i == primaryIdx,
+      ));
+    }
+    entries.sort((a, b) {
+      final int am = a.baseFlat < a.extentFlat ? a.baseFlat : a.extentFlat;
+      final int bm = b.baseFlat < b.extentFlat ? b.baseFlat : b.extentFlat;
+      return am - bm;
+    });
+    void body() {
+      final bool wasActive = _multiCaretActive;
+      _multiCaretActive = true;
+      int delta = 0;
+      final List<CodeLineSelection> results = [];
+      CodeLineSelection? newPrimary;
+      try {
+        for (int i = 0; i < entries.length; i++) {
+          final ({int baseFlat, int extentFlat, bool isPrimary}) entry = entries[i];
+          final int len0 = _documentCharLength;
+          value = value.copyWith(
+            selection: _selectionFromFlat(entry.baseFlat + delta, entry.extentFlat + delta),
+            extraSelections: const <CodeLineSelection>[],
+          );
+          op(i);
+          delta += _documentCharLength - len0;
+          final CodeLineSelection r = value.selection;
+          results.add(r);
+          if (entry.isPrimary) {
+            newPrimary = r;
+          }
+        }
+        final List<CodeLineSelection> merged = _mergeCarets(results);
+        final CodeLineSelection primaryResult =
+            (newPrimary != null && merged.contains(newPrimary)) ? newPrimary : merged.last;
+        value = value.copyWith(
+          selection: primaryResult,
+          extraSelections: merged.where((CodeLineSelection s) => s != primaryResult).toList(),
+        );
+      } finally {
+        _multiCaretActive = wasActive;
+      }
+      makeCursorVisible();
+    }
+    if (revocable) {
+      runRevocableOp(body);
+    } else {
+      body();
+    }
+  }
+
+  /// Text of an arbitrary selection [sel] via flat offsets (multi-line included).
+  String _selectionText(CodeLineSelection sel) {
+    final String doc = text;
+    final int lo = _flatOffsetOf(sel.startIndex, sel.startOffset).clamp(0, doc.length);
+    final int hi = _flatOffsetOf(sel.endIndex, sel.endOffset).clamp(0, doc.length);
+    return hi <= lo ? '' : doc.substring(lo, hi);
+  }
+
   @override
   void runRevocableOp(VoidCallback op) {
+    if (_multiCaretActive) {
+      op();
+      return;
+    }
     _cache.markNewRecord(true);
     op();
     _cache.markNewRecord(false);
@@ -1167,6 +1602,44 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
         baseIndex: selection.baseIndex + 1,
         extentIndex: selection.extentIndex + 1,
       )
+    );
+    makeCursorCenterIfInvisible();
+  }
+
+  void _duplicateSelectionLinesUp() {
+    final int s = selection.startIndex;
+    final int e = selection.endIndex;
+    final CodeLines newCodeLines = codeLines.sublines(0, e + 1);
+    for (int i = s; i <= e; i++) {
+      newCodeLines.add(CodeLine(codeLines[i].text));
+    }
+    if (e + 1 < codeLines.length) {
+      newCodeLines.addFrom(codeLines, e + 1);
+    }
+    value = value.copyWith(
+      codeLines: newCodeLines,
+      selection: selection,
+    );
+    makeCursorCenterIfInvisible();
+  }
+
+  void _duplicateSelectionLinesDown() {
+    final int s = selection.startIndex;
+    final int e = selection.endIndex;
+    final CodeLines newCodeLines = codeLines.sublines(0, e + 1);
+    for (int i = s; i <= e; i++) {
+      newCodeLines.add(CodeLine(codeLines[i].text));
+    }
+    if (e + 1 < codeLines.length) {
+      newCodeLines.addFrom(codeLines, e + 1);
+    }
+    final int span = e - s + 1;
+    value = value.copyWith(
+      codeLines: newCodeLines,
+      selection: selection.copyWith(
+        baseIndex: selection.baseIndex + span,
+        extentIndex: selection.extentIndex + span,
+      ),
     );
     makeCursorCenterIfInvisible();
   }
@@ -1385,25 +1858,40 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
         );
       } else {
         final CodeLines newCodeLines = CodeLines.from(codeLines);
-        String forward = _codeTextAfter(selection.extent);
-        final int indentSizeInForward = _prefixWhitespaceCount(forward);
-        if (indentSizeInForward > 0 && indentSizeInForward % indent.length == 0) {
-          forward = forward.substring(indent.length);
+        if (_isWrapedByClosureSymbol(extentLine.text, selection.extentOffset)) {
+          // Delete left and right closure symbols at same time, like this:
+          // abc{|} -> abc
+          newCodeLines[selection.extentIndex] = extentLine.copyWith(
+            text: extentLine.substring(0, selection.extentOffset - 1) + extentLine.substring(selection.extentOffset + 1)
+          );
+          value = value.copyWith(
+            codeLines: newCodeLines,
+            selection: CodeLineSelection.collapsed(
+              index: selection.extentIndex,
+              offset: selection.extentOffset - 1
+            )
+          );
         } else {
-          // Delete the next character normally
-          final Characters characters = forward.characters;
-          forward = characters.skip(1).string;
+          String forward = _codeTextAfter(selection.extent);
+          final int indentSizeInForward = _prefixWhitespaceCount(forward);
+          if (indentSizeInForward > 0 && indentSizeInForward % indent.length == 0) {
+            forward = forward.substring(indent.length);
+          } else {
+            // Delete the next character normally
+            final Characters characters = forward.characters;
+            forward = characters.skip(1).string;
+          }
+          newCodeLines[selection.extentIndex] = extentLine.copyWith(
+            text: _codeTextBefore(selection.extent) + forward
+          );
+          value = value.copyWith(
+            codeLines: newCodeLines,
+            selection: CodeLineSelection.collapsed(
+              index: selection.extentIndex,
+              offset: selection.extentOffset
+            )
+          );
         }
-        newCodeLines[selection.extentIndex] = extentLine.copyWith(
-          text: _codeTextBefore(selection.extent) + forward
-        );
-        value = value.copyWith(
-          codeLines: newCodeLines,
-          selection: CodeLineSelection.collapsed(
-            index: selection.extentIndex,
-            offset: selection.extentOffset
-          )
-        );
       }
     } else {
       _deleteSelection();
@@ -2125,6 +2613,34 @@ class _CodeLineEditingControllerDelegate implements CodeLineEditingController {
   }
 
   @override
+  List<CodeLineSelection> get selections => _delegate.selections;
+
+  @override
+  void addSelection(CodeLineSelection selection) {
+    _delegate.addSelection(selection);
+  }
+
+  @override
+  void clearSecondarySelections() {
+    _delegate.clearSecondarySelections();
+  }
+
+  @override
+  void addSelectionFromNextOccurrence() {
+    _delegate.addSelectionFromNextOccurrence();
+  }
+
+  @override
+  void selectAllOccurrences() {
+    _delegate.selectAllOccurrences();
+  }
+
+  @override
+  void addCaretVertically({required bool above}) {
+    _delegate.addCaretVertically(above: above);
+  }
+
+  @override
   String get text => _delegate.text;
 
   @override
@@ -2413,6 +2929,16 @@ class _CodeLineEditingControllerDelegate implements CodeLineEditingController {
   @override
   void moveSelectionLinesUp() {
     _delegate.moveSelectionLinesUp();
+  }
+
+  @override
+  void duplicateSelectionLinesUp() {
+    _delegate.duplicateSelectionLinesUp();
+  }
+
+  @override
+  void duplicateSelectionLinesDown() {
+    _delegate.duplicateSelectionLinesDown();
   }
 
   @override

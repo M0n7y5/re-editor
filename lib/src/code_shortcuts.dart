@@ -15,6 +15,8 @@ enum CodeShortcutType {
   lineDeleteBackward,
   lineMoveUp,
   lineMoveDown,
+  lineDuplicateUp,
+  lineDuplicateDown,
   cursorMoveUp,
   cursorMoveDown,
   cursorMoveForward,
@@ -50,6 +52,10 @@ enum CodeShortcutType {
   findToggleRegex,
   replace,
   save,
+  addCaretNextOccurrence,
+  addCaretAbove,
+  addCaretBelow,
+  selectAllOccurrences,
   esc,
 }
 
@@ -112,6 +118,11 @@ class ShortcutLineDeleteIntent extends CodeShortcutEditableIntent {
 class ShortcutLineMoveIntent extends CodeShortcutEditableIntent {
   final VerticalDirection direction;
   const ShortcutLineMoveIntent(this.direction);
+}
+
+class ShortcutLineDuplicateIntent extends CodeShortcutEditableIntent {
+  final VerticalDirection direction;
+  const ShortcutLineDuplicateIntent(this.direction);
 }
 
 class ShortcutLineDeleteDirectionIntent extends CodeShortcutEditableIntent {
@@ -219,6 +230,19 @@ class CodeShortcutEscIntent extends Intent {
   const CodeShortcutEscIntent();
 }
 
+class CodeShortcutAddCaretNextOccurrenceIntent extends Intent {
+  const CodeShortcutAddCaretNextOccurrenceIntent();
+}
+
+class CodeShortcutSelectAllOccurrencesIntent extends Intent {
+  const CodeShortcutSelectAllOccurrencesIntent();
+}
+
+class CodeShortcutAddCaretIntent extends Intent {
+  const CodeShortcutAddCaretIntent(this.above);
+  final bool above;
+}
+
 const Map<CodeShortcutType, Intent> kCodeShortcutIntents = {
   CodeShortcutType.selectAll: CodeShortcutSelectAllIntent(),
   CodeShortcutType.cut: CodeShortcutCutIntent(),
@@ -234,6 +258,8 @@ const Map<CodeShortcutType, Intent> kCodeShortcutIntents = {
   CodeShortcutType.lineDeleteBackward: ShortcutLineDeleteDirectionIntent(false),
   CodeShortcutType.lineMoveUp: ShortcutLineMoveIntent(VerticalDirection.up),
   CodeShortcutType.lineMoveDown: ShortcutLineMoveIntent(VerticalDirection.down),
+  CodeShortcutType.lineDuplicateUp: ShortcutLineDuplicateIntent(VerticalDirection.up),
+  CodeShortcutType.lineDuplicateDown: ShortcutLineDuplicateIntent(VerticalDirection.down),
   CodeShortcutType.cursorMoveUp: CodeShortcutCursorMoveIntent(AxisDirection.up),
   CodeShortcutType.cursorMoveDown: CodeShortcutCursorMoveIntent(AxisDirection.down),
   CodeShortcutType.cursorMoveForward: CodeShortcutCursorMoveIntent(AxisDirection.right),
@@ -270,6 +296,10 @@ const Map<CodeShortcutType, Intent> kCodeShortcutIntents = {
   CodeShortcutType.replace: CodeShortcutReplaceIntent(),
   CodeShortcutType.save: CodeShortcutSaveIntent(),
   CodeShortcutType.esc: CodeShortcutEscIntent(),
+  CodeShortcutType.addCaretNextOccurrence: CodeShortcutAddCaretNextOccurrenceIntent(),
+  CodeShortcutType.addCaretAbove: CodeShortcutAddCaretIntent(true),
+  CodeShortcutType.addCaretBelow: CodeShortcutAddCaretIntent(false),
+  CodeShortcutType.selectAllOccurrences: CodeShortcutSelectAllOccurrencesIntent(),
 };
 
 const Map<CodeShortcutType, List<ShortcutActivator>> _kDefaultMacCodeShortcutsActivators = {
@@ -303,7 +333,19 @@ const Map<CodeShortcutType, List<ShortcutActivator>> _kDefaultMacCodeShortcutsAc
     SingleActivator(LogicalKeyboardKey.keyL, meta: true)
   ],
   CodeShortcutType.lineDelete: [
+    SingleActivator(LogicalKeyboardKey.keyK, meta: true, shift: true)
+  ],
+  CodeShortcutType.addCaretNextOccurrence: [
     SingleActivator(LogicalKeyboardKey.keyD, meta: true)
+  ],
+  CodeShortcutType.addCaretAbove: [
+    SingleActivator(LogicalKeyboardKey.arrowUp, alt: true, meta: true)
+  ],
+  CodeShortcutType.addCaretBelow: [
+    SingleActivator(LogicalKeyboardKey.arrowDown, alt: true, meta: true)
+  ],
+  CodeShortcutType.selectAllOccurrences: [
+    SingleActivator(LogicalKeyboardKey.keyL, meta: true, shift: true)
   ],
   CodeShortcutType.lineDeleteForward: [
     SingleActivator(LogicalKeyboardKey.delete, meta: true)
@@ -316,6 +358,12 @@ const Map<CodeShortcutType, List<ShortcutActivator>> _kDefaultMacCodeShortcutsAc
   ],
   CodeShortcutType.lineMoveDown: [
     SingleActivator(LogicalKeyboardKey.arrowDown, alt: true)
+  ],
+  CodeShortcutType.lineDuplicateUp: [
+    SingleActivator(LogicalKeyboardKey.arrowUp, shift: true, alt: true)
+  ],
+  CodeShortcutType.lineDuplicateDown: [
+    SingleActivator(LogicalKeyboardKey.arrowDown, shift: true, alt: true)
   ],
   CodeShortcutType.cursorMoveUp: [
     SingleActivator(LogicalKeyboardKey.arrowUp)
@@ -471,7 +519,19 @@ const Map<CodeShortcutType, List<ShortcutActivator>> _kDefaultCommonCodeShortcut
     SingleActivator(LogicalKeyboardKey.keyL, control: true)
   ],
   CodeShortcutType.lineDelete: [
+    SingleActivator(LogicalKeyboardKey.keyK, control: true, shift: true)
+  ],
+  CodeShortcutType.addCaretNextOccurrence: [
     SingleActivator(LogicalKeyboardKey.keyD, control: true)
+  ],
+  CodeShortcutType.addCaretAbove: [
+    SingleActivator(LogicalKeyboardKey.arrowUp, alt: true, control: true)
+  ],
+  CodeShortcutType.addCaretBelow: [
+    SingleActivator(LogicalKeyboardKey.arrowDown, alt: true, control: true)
+  ],
+  CodeShortcutType.selectAllOccurrences: [
+    SingleActivator(LogicalKeyboardKey.keyL, control: true, shift: true)
   ],
   CodeShortcutType.lineDeleteForward: [
     SingleActivator(LogicalKeyboardKey.delete, control: true)
@@ -484,6 +544,12 @@ const Map<CodeShortcutType, List<ShortcutActivator>> _kDefaultCommonCodeShortcut
   ],
   CodeShortcutType.lineMoveDown: [
     SingleActivator(LogicalKeyboardKey.arrowDown, alt: true)
+  ],
+  CodeShortcutType.lineDuplicateUp: [
+    SingleActivator(LogicalKeyboardKey.arrowUp, shift: true, alt: true)
+  ],
+  CodeShortcutType.lineDuplicateDown: [
+    SingleActivator(LogicalKeyboardKey.arrowDown, shift: true, alt: true)
   ],
   CodeShortcutType.cursorMoveUp: [
     SingleActivator(LogicalKeyboardKey.arrowUp)

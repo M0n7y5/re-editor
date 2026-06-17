@@ -199,6 +199,9 @@ class _CodeAutocompleteState extends State<_CodeAutocomplete> {
     required ValueChanged<CodeAutocompleteResult> onAutocomplete,
   }) {
     dismiss();
+    if (value.extraSelections.isNotEmpty) {
+      return;
+    }
     final CodeAutocompleteEditingValue? autocompleteEditingValue = widget.promptsBuilder.build(
       context,
       value.codeLines[value.selection.extentIndex],

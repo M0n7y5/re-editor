@@ -113,6 +113,12 @@ abstract class CodeLineEditingController extends ValueNotifier<CodeLineEditingVa
   /// Get the current editor code selections.
   CodeLineSelection get selection;
 
+  /// Get the full set of carets (primary + secondary) for multi-cursor editing.
+  ///
+  /// Always contains at least one entry; the primary caret ([selection]) is
+  /// always the LAST element.
+  List<CodeLineSelection> get selections;
+
   /// Get the range of code that is still being composed.
   TextRange get composing;
 
@@ -196,11 +202,40 @@ abstract class CodeLineEditingController extends ValueNotifier<CodeLineEditingVa
   /// The selection will be collaposed at the terminate position.
   void cancelSelection();
 
+  /// Add a secondary caret for multi-cursor editing. The added caret becomes
+  /// the new primary [selection]. No-op if it duplicates an existing caret.
+  void addSelection(CodeLineSelection selection);
+
+  /// Remove all secondary carets, keeping only the primary [selection].
+  void clearSecondarySelections();
+
+  /// Add a caret at the next occurrence of the current word or selection
+  /// (VSCode Ctrl/Cmd+D). With a collapsed primary caret this first selects
+  /// the word under the caret.
+  void addSelectionFromNextOccurrence();
+
+  /// Select every occurrence of the current word or selection as independent
+  /// carets (VSCode Ctrl/Cmd+Shift+L). With a collapsed primary caret this
+  /// first selects the word under the caret, then matches that word.
+  void selectAllOccurrences();
+
+  /// Add a caret one line above or below the primary caret
+  /// (VSCode Ctrl/Alt+Up/Down).
+  void addCaretVertically({required bool above});
+
   /// Move up the selected code lines.
   void moveSelectionLinesUp();
 
   /// Move down the selected code lines.
   void moveSelectionLinesDown();
+
+  /// Duplicate the selected code lines upward; the cursor stays on the upper
+  /// copy (VSCode Shift+Alt+Up).
+  void duplicateSelectionLinesUp();
+
+  /// Duplicate the selected code lines downward; the cursor follows the lower
+  /// copy (VSCode Shift+Alt+Down).
+  void duplicateSelectionLinesDown();
 
   /// Move the cursor to a direction.
   void moveCursor(AxisDirection direction);
@@ -512,6 +547,7 @@ class CodeLineEditingValue {
     required this.codeLines,
     this.selection = const CodeLineSelection.zero(),
     this.composing = TextRange.empty,
+    this.extraSelections = const <CodeLineSelection>[],
   });
 
   const CodeLineEditingValue.empty() : this(
@@ -551,15 +587,23 @@ class CodeLineEditingValue {
   /// text is not currently being composed.
   final TextRange composing;
 
+  /// Additional (secondary) carets for multi-cursor editing.
+  ///
+  /// Empty in the normal single-caret state; [selection] is always the
+  /// primary caret and these are the others.
+  final List<CodeLineSelection> extraSelections;
+
   CodeLineEditingValue copyWith({
     CodeLines? codeLines,
     CodeLineSelection? selection,
     TextRange? composing,
+    List<CodeLineSelection>? extraSelections,
   }) {
     return CodeLineEditingValue(
       codeLines: codeLines ?? this.codeLines,
       selection: selection ?? this.selection,
-      composing: composing ?? this.composing
+      composing: composing ?? this.composing,
+      extraSelections: extraSelections ?? this.extraSelections,
     );
   }
 
@@ -573,15 +617,16 @@ class CodeLineEditingValue {
     return other is CodeLineEditingValue
         && other.codeLines.equals(codeLines)
         && other.selection == selection
-        && other.composing == composing;
+        && other.composing == composing
+        && listEquals(other.extraSelections, extraSelections);
   }
 
   @override
-  int get hashCode => Object.hash(codeLines, selection, composing);
+  int get hashCode => Object.hash(codeLines, selection, composing, Object.hashAll(extraSelections));
 
   @override
   String toString() {
-    return 'codeLines: $codeLines, selection: $selection, composing: $composing';
+    return 'codeLines: $codeLines, selection: $selection, composing: $composing, extraSelections: $extraSelections';
   }
 
 }
@@ -1190,3 +1235,85 @@ extension CodeLineExtension on String {
   }
 
 }
+
+/// Caps the bracket-match scan so a missing partner cannot walk an entire huge
+/// buffer. Past this many lines the scan gives up and reports no match.
+const int _kBracketScanLineCap = 10000;
+
+/// Finds the bracket pair to highlight for a collapsed [selection].
+///
+/// Returns two single-character ranges — the bracket the caret sits next to
+/// (preferring the one on its left) and the matching partner found by a depth
+/// scan — or an empty list when the caret is not adjacent to a bracket or no
+/// partner is found within [_kBracketScanLineCap] lines. The scan is a raw
+/// depth count that ignores strings and comments.
+List<CodeLineSelection> findMatchingBracketHighlights(CodeLines codeLines, CodeLineSelection selection) {
+  if (!selection.isCollapsed) {
+    return const <CodeLineSelection>[];
+  }
+  const String opens = '([{';
+  const String closes = ')]}';
+  final int li = selection.extentIndex;
+  if (li < 0 || li >= codeLines.length) {
+    return const <CodeLineSelection>[];
+  }
+  final String line = codeLines[li].text;
+  final int off = selection.extentOffset;
+  int bracketOffset = -1;
+  String? bracket;
+  if (off > 0 && (opens.contains(line[off - 1]) || closes.contains(line[off - 1]))) {
+    bracket = line[off - 1];
+    bracketOffset = off - 1;
+  } else if (off < line.length && (opens.contains(line[off]) || closes.contains(line[off]))) {
+    bracket = line[off];
+    bracketOffset = off;
+  }
+  if (bracket == null) {
+    return const <CodeLineSelection>[];
+  }
+  final bool forward = opens.contains(bracket);
+  final String partner = forward ? closes[opens.indexOf(bracket)] : opens[closes.indexOf(bracket)];
+  int depth = 0;
+  int scanned = 0;
+  if (forward) {
+    for (int i = li; i < codeLines.length && scanned <= _kBracketScanLineCap; i++, scanned++) {
+      final String text = codeLines[i].text;
+      final int from = i == li ? bracketOffset : 0;
+      for (int j = from; j < text.length; j++) {
+        final String c = text[j];
+        if (c == bracket) {
+          depth++;
+        } else if (c == partner) {
+          depth--;
+          if (depth == 0) {
+            return <CodeLineSelection>[_bracketRange(li, bracketOffset), _bracketRange(i, j)];
+          }
+        }
+      }
+    }
+  } else {
+    for (int i = li; i >= 0 && scanned <= _kBracketScanLineCap; i--, scanned++) {
+      final String text = codeLines[i].text;
+      final int from = i == li ? bracketOffset : text.length - 1;
+      for (int j = from; j >= 0; j--) {
+        final String c = text[j];
+        if (c == bracket) {
+          depth++;
+        } else if (c == partner) {
+          depth--;
+          if (depth == 0) {
+            return <CodeLineSelection>[_bracketRange(i, j), _bracketRange(li, bracketOffset)];
+          }
+        }
+      }
+    }
+  }
+  return const <CodeLineSelection>[];
+}
+
+CodeLineSelection _bracketRange(int index, int offset) => CodeLineSelection(
+  baseIndex: index,
+  baseOffset: offset,
+  extentIndex: index,
+  extentOffset: offset + 1,
+);

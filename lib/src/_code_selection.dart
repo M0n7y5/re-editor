@@ -169,6 +169,12 @@ class _CodeSelectionGestureDetectorState extends State<_CodeSelectionGestureDete
       LogicalKeyboardKey.shiftRight,
     }.contains);
 
+  bool get _isAltPressed => _isMobile ? false : HardwareKeyboard.instance.logicalKeysPressed
+    .any(<LogicalKeyboardKey>{
+      LogicalKeyboardKey.altLeft,
+      LogicalKeyboardKey.altRight,
+    }.contains);
+
   void _onMobileTapDown(Offset position) {
     _selectPosition(position, _SelectionChangedCause.tapDown);
     widget.selectionOverlayController.hideHandle();
@@ -218,6 +224,13 @@ class _CodeSelectionGestureDetectorState extends State<_CodeSelectionGestureDete
       kDoubleTapTimeout.inMilliseconds && _pointerTapPosition != null && _pointerTapPosition!.isSamePosition(position)) {
       _onDoubleTap(position);
     } else {
+      if (_isAltPressed) {
+        final CodeLineSelection? caret = render.setPositionAt(position: position);
+        if (caret != null) {
+          widget.controller.addSelection(caret);
+        }
+        return;
+      }
       if (widget.controller.selection.baseOffset != -1) {
         if (_isShiftPressed) {
           _extendSelection(position, _SelectionChangedCause.tapDown);

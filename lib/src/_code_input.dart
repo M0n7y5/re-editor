@@ -140,6 +140,24 @@ class _CodeInputController extends ChangeNotifier implements DeltaTextInputClien
       return;
     }
 
+    if (_controller.selections.length > 1) {
+      for (final TextEditingDelta delta in textEditingDeltas) {
+        if (delta is TextEditingDeltaInsertion) {
+          if (delta.textInserted == '\n') {
+            _controller.applyNewLine();
+          } else {
+            _controller.replaceSelection(delta.textInserted);
+          }
+        } else if (delta is TextEditingDeltaReplacement) {
+          _controller.replaceSelection(delta.replacementText);
+        } else if (delta is TextEditingDeltaDeletion) {
+          _controller.deleteBackward();
+        }
+      }
+      notifyListeners();
+      return;
+    }
+
     if (textEditingDeltas.any((delta) => delta is TextEditingDeltaInsertion && delta.textInserted == '\n')) {
       TextEditingValue newValue = _remoteEditingValue!;
       for (final TextEditingDelta delta in textEditingDeltas) {

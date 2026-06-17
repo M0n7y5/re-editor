@@ -21,6 +21,7 @@ class _CodeEditable extends StatefulWidget {
   final Color highlightColor;
   final Color cursorColor;
   final Color? cursorLineColor;
+  final Color? bracketMatchColor;
   final Color? chunkIndicatorColor;
   final double cursorWidth;
   final bool showCursorWhenReadOnly;
@@ -62,6 +63,7 @@ class _CodeEditable extends StatefulWidget {
     required this.highlightColor,
     required this.cursorColor,
     this.cursorLineColor,
+    this.bracketMatchColor,
     this.chunkIndicatorColor,
     required this.cursorWidth,
     required this.showCursorWhenReadOnly,
@@ -287,6 +289,8 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
       verticalScrollbarWidth: widget.verticalScrollbarWidth ?? _kScrollbarThickness,
       horizontalScrollbarHeight: widget.horizontalScrollbarHeight ?? _kScrollbarThickness,
       selection: widget.controller.selection,
+      carets: widget.controller.selections,
+      matchedBrackets: findMatchingBracketHighlights(widget.controller.codeLines, widget.controller.selection),
       highlightSelections: widget.findController.allMatchSelections,
       codes: widget.controller.codeLines,
       textStyle: widget.textStyle,
@@ -304,6 +308,7 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
       highlightColor: widget.highlightColor,
       cursorColor: widget.cursorColor,
       cursorLineColor: widget.cursorLineColor,
+      bracketMatchColor: widget.bracketMatchColor,
       chunkIndicatorColor: widget.chunkIndicatorColor,
       cursorWidth: widget.cursorWidth,
       padding: widget.padding,
