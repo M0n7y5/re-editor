@@ -334,7 +334,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       extraSelections: <CodeLineSelection>[...value.extraSelections, value.selection],
       selection: selection,
     );
-    makeCursorVisible();
+    _revealPrimaryCaret();
   }
 
   @override
@@ -421,7 +421,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     }
     newPrimary ??= carets.isNotEmpty ? carets.removeAt(0) : primary;
     value = value.copyWith(selection: newPrimary, extraSelections: carets);
-    makeCursorVisible();
+    _revealPrimaryCaret();
   }
 
   @override
@@ -1315,11 +1315,34 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void makeCursorCenterIfInvisible() {
+    // VSCode parity: suppressed while multiple carets are active (see
+    // [makeCursorVisible]). The insert path (_replaceRange) routes its reveal
+    // through here, so without this gate a multi-caret type still chases each
+    // caret as the loop visits it.
+    if (_multiCaretActive || value.extraSelections.isNotEmpty) {
+      return;
+    }
     _render?.makePositionCenterIfInvisible(selection.extent);
   }
 
   @override
   void makeCursorVisible() {
+    // VSCode parity: while multiple carets are active, editing or moving must
+    // not chase the primary caret around the document. [_multiCaretActive]
+    // covers the per-caret loop (each iteration leaves a lone primary);
+    // [extraSelections] covers the committed multi-caret state. Explicit
+    // caret-adding ops reveal via [_revealPrimaryCaret], bypassing this guard.
+    if (_multiCaretActive || value.extraSelections.isNotEmpty) {
+      return;
+    }
+    _render?.makePositionVisible(selection.extent);
+  }
+
+  /// Reveal the primary caret unconditionally, bypassing the multi-caret
+  /// suppression in [makeCursorVisible]. Used when *adding* a caret (Ctrl+D /
+  /// select-all-occurrences) so the newly added match scrolls into view,
+  /// matching VSCode.
+  void _revealPrimaryCaret() {
     _render?.makePositionVisible(selection.extent);
   }
 
