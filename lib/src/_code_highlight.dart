@@ -17,6 +17,10 @@ class _CodeHighlighter extends ValueNotifier<_HighlightResults> {
   bool _running = false; // a worker run is in flight
   bool _dirty = false; // a (re)highlight is requested
   bool _docDirty = false; // document changed since the last shipped run
+  // Last good highlight per line text. An unchanged line that only shifted
+  // index (newline above, paste, line move) reuses these colours instead of
+  // flashing while the worker recomputes the viewport window.
+  Map<String, _HighlightResult> _byText = const <String, _HighlightResult>{};
 
   _CodeHighlighter({
     required BuildContext context,
@@ -89,14 +93,21 @@ class _CodeHighlighter extends ValueNotifier<_HighlightResults> {
   TextSpan _buildSpan(int index, TextStyle style) {
     final String text = _controller.codeLines[index].text;
     final _HighlightResult? result = value[index];
+    if (result != null && result.nodes.isNotEmpty && result.source == text) {
+      return _buildSpanFromNodes(result.nodes, style);
+    }
+    // A line that only shifted index (newline inserted/removed above, paste,
+    // line move) keeps its exact colours via the text-keyed cache, so it never
+    // flashes plain/mis-coloured for the frame(s) before the worker recomputes.
+    final _HighlightResult? cached = _byText[text];
+    if (cached != null) {
+      return _buildSpanFromNodes(cached.nodes, style);
+    }
     if (result == null || result.nodes.isEmpty) {
       return TextSpan(
         text: text,
         style: style
       );
-    }
-    if (result.source == text) {
-      return _buildSpanFromNodes(result.nodes, style);
     }
     // Diff the changes and reuse node to avoid style blink.
     final List<_HighlightNode> startNodes = [];
@@ -205,6 +216,7 @@ class _CodeHighlighter extends ValueNotifier<_HighlightResults> {
     _dirty = false;
     if (_theme == null) {
       _docDirty = false;
+      _byText = const <String, _HighlightResult>{};
       value = _HighlightResults.empty;
       return;
     }
@@ -223,6 +235,13 @@ class _CodeHighlighter extends ValueNotifier<_HighlightResults> {
 
   void _onResult(_HighlightResults result) {
     value = result;
+    final Map<String, _HighlightResult> byText = <String, _HighlightResult>{};
+    for (final _HighlightResult r in result.results) {
+      if (r.nodes.isNotEmpty) {
+        byText[r.source] = r;
+      }
+    }
+    _byText = byText;
     _running = false;
     _pump();
   }
