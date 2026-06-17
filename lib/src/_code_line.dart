@@ -18,6 +18,11 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   late final _CodeLineEditingCache _cache;
   late int _preEditLineIndex;
   CodeLineEditingValue? _preValue;
+  /// Non-null only while [_runBatched] is active: stages `value` writes during
+  /// a multi-caret pass so each assignment skips the two O(doc) `CodeLines`
+  /// equality scans (ValueNotifier setter + undo-cache listener) and the
+  /// listener fan-out. Flushed as one real assignment when the pass ends.
+  CodeLineEditingValue? _batchValue;
   GlobalKey? _editorKey;
 
   _CodeLineEditingControllerImpl({
@@ -52,9 +57,38 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   }
 
   @override
+  CodeLineEditingValue get value => _batchValue ?? super.value;
+
+  @override
   set value(CodeLineEditingValue value) {
+    if (_batchValue != null) {
+      _batchValue = value;
+      return;
+    }
     _preValue = super.value;
     super.value = value;
+  }
+
+  /// Runs [body] with every `value` write staged into [_batchValue] and
+  /// committed as a single real assignment when [body] returns. A multi-caret
+  /// pass writes `value` once per caret; without batching each write pays two
+  /// O(doc) `CodeLines.equals` (the [ValueNotifier] setter and the undo-cache
+  /// listener) plus a full listener fan-out, making a K-caret keystroke
+  /// O(K * doc). Batching collapses that to one compare + one notify. Nested
+  /// calls reuse the in-flight batch.
+  void _runBatched(VoidCallback body) {
+    if (_batchValue != null) {
+      body();
+      return;
+    }
+    _batchValue = super.value;
+    try {
+      body();
+    } finally {
+      final CodeLineEditingValue result = _batchValue!;
+      _batchValue = null;
+      value = result;
+    }
   }
 
   @override
@@ -1369,39 +1403,68 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   bool _multiCaretActive = false;
 
   /// Flat character offset of (line [index], [offset]) in the whole document,
-  /// counting one line break per line. Mirrors the loop in [_replaceAll].
+  /// counting one line break per line. Whole segments are skipped via their
+  /// cached `charCount`/`length` (O(1) each), so this is O(segments + segSize),
+  /// not O(doc) — and never the O(doc^2) that indexing `codeLines[i]` in a loop
+  /// would cost (`CodeLines.operator[]` is itself an O(segments) walk).
   int _flatOffsetOf(int index, int offset) {
+    final int br = lineBreak.value.length;
     int o = 0;
-    for (int i = 0; i < index; i++) {
-      o += codeLines[i].charCount + lineBreak.value.length;
+    int seen = 0;
+    for (final CodeLineSegment segment in codeLines.segments) {
+      final int segLen = segment.length;
+      if (seen + segLen <= index) {
+        o += segment.charCount + segLen * br;
+        seen += segLen;
+      } else {
+        final List<CodeLine> lines = segment.codeLines;
+        final int stop = index - seen;
+        for (int j = 0; j < stop; j++) {
+          o += lines[j].charCount + br;
+        }
+        return o + offset;
+      }
     }
     return o + offset;
   }
 
   /// Inverse of [_flatOffsetOf]: maps a flat offset to (lineIndex, offsetInLine).
+  /// Skips whole earlier segments via their cached flat span; walks line-by-line
+  /// only inside the target (and last) segment, so the last-line clamp holds.
   (int, int) _indexOffsetOfFlat(int target) {
+    final int br = lineBreak.value.length;
+    final int lastIndex = codeLines.length - 1;
+    final List<CodeLineSegment> segments = codeLines.segments;
     int start = 0;
-    final int n = codeLines.length;
-    for (int i = 0; i < n; i++) {
-      final int end = start + codeLines[i].charCount + lineBreak.value.length;
-      if (target < end || i == n - 1) {
-        return (i, (target - start).clamp(0, codeLines[i].charCount));
+    int index = 0;
+    for (int s = 0; s < segments.length; s++) {
+      final CodeLineSegment segment = segments[s];
+      final int segLen = segment.length;
+      final int segFlat = segment.charCount + segLen * br;
+      if (start + segFlat <= target && s < segments.length - 1) {
+        start += segFlat;
+        index += segLen;
+        continue;
       }
-      start = end;
+      final List<CodeLine> lines = segment.codeLines;
+      for (int j = 0; j < segLen; j++) {
+        final int cc = lines[j].charCount;
+        final int end = start + cc + br;
+        if (target < end || index == lastIndex) {
+          return (index, (target - start).clamp(0, cc));
+        }
+        start = end;
+        index++;
+      }
     }
-    return (n - 1, 0);
+    return (lastIndex < 0 ? 0 : lastIndex, 0);
   }
 
   /// Total document length in the same per-line convention as [_flatOffsetOf],
   /// so a before/after difference is the exact net character change of an edit.
-  int get _documentCharLength {
-    int len = 0;
-    final int n = codeLines.length;
-    for (int i = 0; i < n; i++) {
-      len += codeLines[i].charCount + lineBreak.value.length;
-    }
-    return len;
-  }
+  /// O(segments) via the cached per-segment `charCount`/`length`.
+  int get _documentCharLength =>
+      codeLines.charCount + codeLines.length * lineBreak.value.length;
 
   CodeLineSelection _selectionFromFlat(int baseFlat, int extentFlat) {
     final (int, int) b = _indexOffsetOfFlat(baseFlat);
@@ -1549,9 +1612,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       makeCursorVisible();
     }
     if (revocable) {
-      runRevocableOp(body);
+      runRevocableOp(() => _runBatched(body));
     } else {
-      body();
+      _runBatched(body);
     }
   }
 
