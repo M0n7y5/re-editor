@@ -8,7 +8,7 @@ part of re_editor;
 class CodeHighlightTheme {
 
   const CodeHighlightTheme({
-    required this.languages,
+    this.languages = const {},
     required this.theme,
     this.plugins = const [],
   });

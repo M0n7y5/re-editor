@@ -1,6 +1,6 @@
 part of re_editor;
 
-class _CodeHighlighter extends ValueNotifier<List<_HighlightResult>> {
+class _CodeHighlighter extends ValueNotifier<_HighlightResults> {
 
   final BuildContext _context;
   final _CodeParagraphProvider _provider;
@@ -8,6 +8,15 @@ class _CodeHighlighter extends ValueNotifier<List<_HighlightResult>> {
 
   CodeLineEditingController _controller;
   CodeHighlightTheme? _theme;
+
+  // Latest-wins coalescing + viewport state for windowed highlighting.
+  static const int _kHighlightMargin = 50;
+  int _firstVisible = 0;
+  int _lastVisible = 0;
+  CodeLines? _sentCodeLines; // buffer last shipped to the worker (null = none)
+  bool _running = false; // a worker run is in flight
+  bool _dirty = false; // a (re)highlight is requested
+  bool _docDirty = false; // document changed since the last shipped run
 
   _CodeHighlighter({
     required BuildContext context,
@@ -18,9 +27,11 @@ class _CodeHighlighter extends ValueNotifier<List<_HighlightResult>> {
     _controller = controller,
     _theme = theme,
     _engine = _CodeHighlightEngine(theme),
-    super(const []) {
+    super(_HighlightResults.empty) {
     _controller.addListener(_onCodesChanged);
-    _processHighlight();
+    _docDirty = true;
+    _dirty = true;
+    _pump();
   }
 
   set controller(CodeLineEditingController value) {
@@ -30,7 +41,10 @@ class _CodeHighlighter extends ValueNotifier<List<_HighlightResult>> {
     _controller.removeListener(_onCodesChanged);
     _controller = value;
     _controller.addListener(_onCodesChanged);
-    _processHighlight();
+    _sentCodeLines = null;
+    _docDirty = true;
+    _dirty = true;
+    _pump();
   }
 
   set theme(CodeHighlightTheme? value) {
@@ -39,7 +53,10 @@ class _CodeHighlighter extends ValueNotifier<List<_HighlightResult>> {
     }
     _theme = value;
     _engine.theme = value;
-    _processHighlight();
+    _sentCodeLines = null;
+    _docDirty = value != null;
+    _dirty = true;
+    _pump();
   }
 
   IParagraph build({
@@ -71,14 +88,8 @@ class _CodeHighlighter extends ValueNotifier<List<_HighlightResult>> {
 
   TextSpan _buildSpan(int index, TextStyle style) {
     final String text = _controller.codeLines[index].text;
-    if (index >= value.length) {
-      return TextSpan(
-        text: text,
-        style: style
-      );
-    }
-    final _HighlightResult result = value[index];
-    if (result.nodes.isEmpty) {
+    final _HighlightResult? result = value[index];
+    if (result == null || result.nodes.isEmpty) {
       return TextSpan(
         text: text,
         style: style
@@ -139,22 +150,25 @@ class _CodeHighlighter extends ValueNotifier<List<_HighlightResult>> {
   }
 
   TextStyle? _findStyle(String? className) {
-    if (className == null) {
-      return null;
-    }
-    while(true) {
-      final TextStyle? style = _theme?.theme[className];
+    String? name = className;
+    while (name != null && name.isNotEmpty) {
+      final TextStyle? style = _theme?.theme[name];
       if (style != null) {
         return style;
       }
-      final int pieceIndex = className!.indexOf('-');
-      if (pieceIndex < 0) {
+      // tree-sitter capture names nest with '.':
+      // `string.escape` -> `string`, `function.method.call` -> `function`.
+      final int dot = name.lastIndexOf('.');
+      if (dot >= 0) {
+        name = name.substring(0, dot);
+        continue;
+      }
+      // hl.js class names nest with '-': `title-function_` -> `function_`.
+      final int dash = name.indexOf('-');
+      if (dash < 0) {
         break;
       }
-      className = className.substring(pieceIndex + 1);
-      if (className.isEmpty) {
-        break;
-      }
+      name = name.substring(dash + 1);
     }
     return null;
   }
@@ -163,117 +177,146 @@ class _CodeHighlighter extends ValueNotifier<List<_HighlightResult>> {
     if (_controller.preValue?.codeLines == _controller.codeLines) {
       return;
     }
-    _processHighlight();
+    _docDirty = true;
+    _dirty = true;
+    _pump();
   }
 
-  void _processHighlight() {
-    _engine.run(_controller.codeLines, (result) => value = result);
+  /// Called by the render object each layout with the strict visible line
+  /// range. Widens the highlight window if it changed; a no-op otherwise.
+  void setViewport(int first, int last) {
+    if (first == _firstVisible && last == _lastVisible) {
+      return;
+    }
+    _firstVisible = first;
+    _lastVisible = last;
+    _dirty = true;
+    _pump();
+  }
+
+  // Dispatches at most one worker run at a time, always against the latest
+  // viewport, shipping the full buffer only when the document changed since the
+  // last shipped run. Collapses bursts of scroll/edit notifications into one
+  // trailing run (the isolate tasker is FIFO and does not coalesce).
+  void _pump() {
+    if (_running || !_dirty) {
+      return;
+    }
+    _dirty = false;
+    if (_theme == null) {
+      _docDirty = false;
+      value = _HighlightResults.empty;
+      return;
+    }
+    final CodeLines codeLines = _controller.codeLines;
+    final bool ship = _docDirty || _sentCodeLines == null;
+    _docDirty = false;
+    if (ship) {
+      _sentCodeLines = codeLines;
+    }
+    final int lineCount = codeLines.length;
+    final int first = max(0, _firstVisible - _kHighlightMargin);
+    final int last = min(lineCount - 1, _lastVisible + _kHighlightMargin);
+    _running = true;
+    _engine.run(ship ? codeLines : null, first, last, _onResult);
+  }
+
+  void _onResult(_HighlightResults result) {
+    value = result;
+    _running = false;
+    _pump();
   }
 
 }
 
 class _CodeHighlightEngine {
 
-  late final _IsolateTasker<_HighlightPayload, List<_HighlightResult>> _tasker;
+  late final _IsolateTasker<_HighlightPayload, _HighlightResults> _tasker;
 
-  Highlight? _highlight;
   CodeHighlightTheme? _theme;
 
   _CodeHighlightEngine(final CodeHighlightTheme? theme) {
-    this.theme = theme;
-    _tasker = _IsolateTasker<_HighlightPayload, List<_HighlightResult>>('CodeHighlightEngine', _run);
+    _theme = theme;
+    _tasker = _IsolateTasker<_HighlightPayload, _HighlightResults>('CodeHighlightEngine', _run);
   }
 
+  // A null theme disables highlighting (the editor renders plain text).
   set theme(CodeHighlightTheme? value) {
-    if (_theme == value) {
-      return;
-    }
     _theme = value;
-    final Map<String, CodeHighlightThemeMode>? modes = _theme?.languages;
-    if (modes == null) {
-      _highlight = null;
-    } else {
-      final Highlight highlight = Highlight();
-      highlight.registerLanguages(modes.map((key, value) => MapEntry(key, value.mode)));
-      for (final HLPlugin plugin in _theme!.plugins) {
-        highlight.addPlugin(plugin);
-      }
-      _highlight = highlight;
-    }
   }
 
   void dispose() {
     _tasker.close();
   }
 
-  void run(CodeLines codes, IsolateCallback<List<_HighlightResult>> callback) {
-    final Highlight? highlight = _highlight;
-    if (highlight == null) {
-      callback(const []);
+  void run(CodeLines? codes, int firstLine, int lastLine,
+      IsolateCallback<_HighlightResults> callback) {
+    if (_theme == null) {
+      callback(_HighlightResults.empty);
       return;
     }
-    final Map<String, CodeHighlightThemeMode>? modes = _theme?.languages;
-    if (modes == null) {
-      callback(const []);
-      return;
-    }
-    _tasker.run(_HighlightPayload(
-      highlight: highlight,
-      codes: codes,
-      languages: modes.keys.toList(),
-      maxSizes: modes.values.map((e) => e.maxSize).toList(),
-      maxLineLengths: modes.values.map((e) => e.maxLineLength).toList(),
-    ), callback);
+    _tasker.run(_HighlightPayload(codes, firstLine, lastLine), callback);
   }
 
   @pragma('vm:entry-point')
-  static List<_HighlightResult> _run(_HighlightPayload payload) {
-    final CodeLines codeLines = payload.codes;
-    final int maxSize = payload.maxSizes.reduce(min);
-    final int maxLineLength = payload.maxLineLengths.reduce(min);
-    // Evalaute performance
-    bool canHighlight = true;
-    int total = 0;
-    for (int i = 0; i < codeLines.length; i++) {
-      final int length = codeLines[i].length;
-      if (length > maxLineLength || total > maxSize) {
-        canHighlight = false;
-        break;
-      }
-      total += length;
+  static _HighlightResults _run(_HighlightPayload payload) {
+    final DartHighlighter highlighter = _isoHighlighter ??= DartHighlighter();
+    final CodeLines? codes = payload.codes;
+    if (codes != null) {
+      highlighter.update(codes.asString(TextLineBreak.lf, false));
     }
-    final String code = payload.codes.asString(TextLineBreak.lf, false);
-    final HighlightResult result;
-    if (!canHighlight) {
-      result = payload.highlight.justTextHighlightResult(code);
-    } else if (payload.languages.length == 1) {
-      result = payload.highlight.highlight(code: code, language: payload.languages.first);
-    } else {
-      result = payload.highlight.highlightAuto(code, payload.languages);
-    }
-    final _HighlightLineRenderer renderer = _HighlightLineRenderer();
-    result.render(renderer);
-    return renderer.lineResults;
+    final WindowHighlight window =
+        highlighter.highlightWindow(payload.firstLine, payload.lastLine);
+    final List<_HighlightResult> results = <_HighlightResult>[
+      for (final LineHighlight line in window.lines)
+        _buildLineResult(line.text, line.ranges),
+    ];
+    return _HighlightResults(window.firstLine, results);
   }
 
 }
 
 class _HighlightPayload {
 
-  final Highlight highlight;
-  final CodeLines codes;
-  final List<String> languages;
-  final List<int> maxSizes;
-  final List<int> maxLineLengths;
+  final CodeLines? codes;
+  final int firstLine;
+  final int lastLine;
 
-  const _HighlightPayload({
-    required this.highlight,
-    required this.codes,
-    required this.languages,
-    required this.maxSizes,
-    required this.maxLineLengths,
-  });
+  const _HighlightPayload(this.codes, this.firstLine, this.lastLine);
 
+}
+
+/// The tree-sitter highlighter, lazily created inside (and owned by) the
+/// highlight worker isolate. The engine keeps a single persistent worker, so
+/// the parser + compiled query are built once and reused across runs.
+DartHighlighter? _isoHighlighter;
+
+/// Converts one line's [ranges] into a full-coverage [_HighlightResult]: gap
+/// nodes (no class) fill the unstyled stretches so the node values concatenate
+/// to exactly [text], letting `_buildSpan` take its `source == text` fast path.
+/// A line with no ranges yields empty nodes (plain text).
+_HighlightResult _buildLineResult(String text, List<StyledRange> ranges) {
+  if (ranges.isEmpty) {
+    return _HighlightResult(const []);
+  }
+  final List<_HighlightNode> nodes = <_HighlightNode>[];
+  int cursor = 0;
+  for (final StyledRange r in ranges) {
+    final int start = r.start < 0 ? 0 : r.start;
+    final int end = r.end > text.length ? text.length : r.end;
+    if (start >= end) {
+      continue;
+    }
+    if (start > cursor) {
+      nodes.add(_HighlightNode(text.substring(cursor, start)));
+    }
+    nodes.add(_HighlightNode(text.substring(start, end), r.capture));
+    cursor = end;
+  }
+  if (cursor < text.length) {
+    nodes.add(_HighlightNode(text.substring(cursor)));
+  }
+  return _HighlightResult(nodes);
 }
 
 class _HighlightResult {
@@ -284,6 +327,24 @@ class _HighlightResult {
   String get source => nodes.map((e) => e.value).join();
 }
 
+/// A windowed batch of per-line highlight results: [results] are the styled
+/// lines starting at absolute line index [start]. Indexing by an absolute line
+/// outside the window yields null, so the consumer falls back to plain text.
+class _HighlightResults {
+  const _HighlightResults(this.start, this.results);
+
+  final int start;
+  final List<_HighlightResult> results;
+
+  static const _HighlightResults empty =
+      _HighlightResults(0, <_HighlightResult>[]);
+
+  _HighlightResult? operator [](int index) {
+    final int i = index - start;
+    return (i < 0 || i >= results.length) ? null : results[i];
+  }
+}
+
 class _HighlightNode {
 
   final String? className;
@@ -291,47 +352,3 @@ class _HighlightNode {
 
   const _HighlightNode(this.value, [this.className]);
 }
-
-class _HighlightLineRenderer implements HighlightRenderer {
-
-  final List<_HighlightResult> lineResults;
-  final List<String?> classNames;
-  _HighlightLineRenderer(): lineResults = [
-    _HighlightResult([])
-  ], classNames = [];
-
-  @override
-  void addText(String text) {
-    final String? className = classNames.isEmpty ? null : classNames.last;
-    final List<String> lines = text.split(TextLineBreak.lf.value);
-    lineResults.last.nodes.add(_HighlightNode(lines.first, className));
-    if (lines.length > 1) {
-      for (int i = 1; i < lines.length; i++) {
-        lineResults.add(_HighlightResult([_HighlightNode(lines[i], className)]));
-      }
-    }
-  }
-
-  @override
-  void openNode(DataNode node) {
-    final String? className = classNames.isEmpty ? null : classNames.last;
-    String? newClassName;
-    if (className == null || node.scope == null) {
-      newClassName = node.scope;
-    } else {
-      newClassName = '$className-${node.scope!}';
-    }
-    newClassName = newClassName?.split('.')[0];
-    classNames.add(newClassName);
-  }
-
-
-  @override
-  void closeNode(DataNode node) {
-    if (classNames.isNotEmpty) {
-      classNames.removeLast();
-    }
-  }
-
-}
-

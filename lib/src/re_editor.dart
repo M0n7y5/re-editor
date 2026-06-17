@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 
 import 'package:re_highlight/re_highlight.dart';
 import 'package:isolate_manager/isolate_manager.dart';
+import 'package:nok_tree_sitter/nok_tree_sitter.dart' show DartHighlighter, StyledRange, WindowHighlight, LineHighlight;
 
 part '_code_floating_cursor.dart';
 part '_code_autocomplete.dart';

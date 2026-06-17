@@ -1081,6 +1081,10 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
       return;
     }
 
+    // Push the strict visible line range to the highlighter so it windows the
+    // tree-sitter query to the viewport (+overscan). Async-only — no layout
+    // mutation here; the result later notifies and triggers a repaint.
+    _highlighter.setViewport(_displayParagraphs.first.index, _displayParagraphs.last.index);
     _onRenderParagraphsChanged(_displayParagraphs.map((e) => e.copyWith(
       offset: Offset(e.offset.dx - (_horizontalViewport?.pixels ?? 0) , e.offset.dy - _verticalViewport.pixels)
     )).toList());
