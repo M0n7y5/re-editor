@@ -903,4 +903,36 @@ void main() {
     });
   });
 
+  group('CodeLines.fromText line endings ', () {
+    test('normalizes CRLF and lone CR to plain line splits', () {
+      expect(CodeLines.fromText('a\r\nb'),
+          CodeLines.of(const [CodeLine('a'), CodeLine('b')]));
+      expect(CodeLines.fromText('a\rb'),
+          CodeLines.of(const [CodeLine('a'), CodeLine('b')]));
+      expect(CodeLines.fromText('a\r\nb\nc\rd'),
+          CodeLines.of(const [CodeLine('a'), CodeLine('b'), CodeLine('c'), CodeLine('d')]));
+      // no stray carriage return retained on a line
+      expect(CodeLines.fromText('a\r\nb')[0].text, 'a');
+    });
+
+    test('a trailing newline yields a trailing empty line', () {
+      expect(CodeLines.fromText('a\nb\n'),
+          CodeLines.of(const [CodeLine('a'), CodeLine('b'), CodeLine('')]));
+      expect(CodeLines.fromText('a\nb').length, 2); // no trailing newline -> no extra line
+    });
+
+    test('an empty string is a single empty line', () {
+      final CodeLines cl = CodeLines.fromText('');
+      expect(cl.length, 1);
+      expect(cl[0], CodeLine.empty);
+    });
+
+    test('a single very long line parses to one CodeLine and stays valid', () {
+      final CodeLines cl = CodeLines.fromText('x' * 200000);
+      expect(cl.length, 1);
+      expect(cl[0].text.length, 200000);
+      cl.debugValidate();
+    });
+  });
+
 }

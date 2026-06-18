@@ -4691,4 +4691,119 @@ void main() {
     });
 
   });
+
+  group('CodeLineEditingController undo/redo ', () {
+    test('single edit: undo restores buffer, redo re-applies, flags track', () {
+      final CodeLineEditingController controller = CodeLineEditingController(
+        codeLines: CodeLines.of(const [CodeLine('ab'), CodeLine('c')]),
+      );
+      expect(controller.canUndo, isFalse);
+      expect(controller.canRedo, isFalse);
+
+      controller.selection = const CodeLineSelection.collapsed(index: 0, offset: 1);
+      controller.applyNewLine(); // split 'ab' at offset 1 -> 'a' / 'b'
+      expect(controller.codeLines,
+          CodeLines.of(const [CodeLine('a'), CodeLine('b'), CodeLine('c')]));
+      expect(controller.canUndo, isTrue);
+      expect(controller.canRedo, isFalse);
+      final CodeLineSelection selAfterEdit = controller.selection;
+
+      controller.undo();
+      expect(controller.codeLines,
+          CodeLines.of(const [CodeLine('ab'), CodeLine('c')]));
+      expect(controller.selection,
+          const CodeLineSelection.collapsed(index: 0, offset: 1));
+      expect(controller.canRedo, isTrue);
+
+      controller.redo();
+      expect(controller.codeLines,
+          CodeLines.of(const [CodeLine('a'), CodeLine('b'), CodeLine('c')]));
+      expect(controller.selection, selAfterEdit); // redo restores full value
+      expect(controller.canRedo, isFalse);
+    });
+
+    test('multi-step chain: undo and redo walk every record in order', () {
+      final CodeLineEditingController controller = CodeLineEditingController(
+        codeLines: CodeLines.of(const [CodeLine('a'), CodeLine('b'), CodeLine('c')]),
+      );
+      controller.selection = const CodeLineSelection.collapsed(index: 0, offset: 0);
+      controller.duplicateSelectionLinesDown(); // [a,a,b,c]   caret -> line 1
+      controller.duplicateSelectionLinesDown(); // [a,a,a,b,c] caret -> line 2
+      controller.duplicateSelectionLinesDown(); // [a,a,a,a,b,c]
+      expect(controller.codeLines.length, 6);
+
+      controller.undo();
+      expect(controller.codeLines.length, 5);
+      controller.undo();
+      expect(controller.codeLines.length, 4);
+      controller.undo();
+      expect(controller.codeLines,
+          CodeLines.of(const [CodeLine('a'), CodeLine('b'), CodeLine('c')]));
+
+      controller.redo();
+      expect(controller.codeLines.length, 4);
+      controller.redo();
+      controller.redo();
+      expect(controller.codeLines.length, 6);
+    });
+
+    test('a new edit after undo truncates the redo branch', () {
+      final CodeLineEditingController controller = CodeLineEditingController(
+        codeLines: CodeLines.of(const [CodeLine('a'), CodeLine('b')]),
+      );
+      controller.selection = const CodeLineSelection.collapsed(index: 0, offset: 0);
+      controller.duplicateSelectionLinesDown(); // [a,a,b]
+      controller.undo();                          // back to [a,b]
+      expect(controller.canRedo, isTrue);
+
+      controller.duplicateSelectionLinesDown(); // new edit -> drops the old redo
+      expect(controller.codeLines,
+          CodeLines.of(const [CodeLine('a'), CodeLine('a'), CodeLine('b')]));
+      expect(controller.canRedo, isFalse);
+    });
+
+    test('undo restores a buffer spanning multiple segments and stays valid', () {
+      // 600 lines => > 2 segments (leaf cap is 256), so the edit and its undo
+      // cross segment boundaries in the AVL tree.
+      final List<CodeLine> lines =
+          List<CodeLine>.generate(600, (int i) => CodeLine('line$i'));
+      final CodeLineEditingController controller =
+          CodeLineEditingController(codeLines: CodeLines.of(lines));
+
+      controller.selection = const CodeLineSelection.collapsed(index: 300, offset: 0);
+      controller.duplicateSelectionLinesDown(); // copy of 'line300' at index 301
+      expect(controller.codeLines.length, 601);
+      expect(controller.codeLines[300], const CodeLine('line300'));
+      expect(controller.codeLines[301], const CodeLine('line300'));
+      controller.codeLines.debugValidate();
+
+      controller.undo();
+      expect(controller.codeLines.length, 600);
+      expect(controller.codeLines[300], const CodeLine('line300'));
+      expect(controller.codeLines[301], const CodeLine('line301'));
+      controller.codeLines.debugValidate();
+
+      controller.redo();
+      expect(controller.codeLines.length, 601);
+      controller.codeLines.debugValidate();
+    });
+
+    test('a very long single line survives an edit and undo without crashing', () {
+      final String big = 'x' * 200000;
+      final CodeLineEditingController controller =
+          CodeLineEditingController(codeLines: CodeLines.of([CodeLine(big)]));
+      expect(controller.codeLines.length, 1);
+      expect(controller.codeLines[0].text.length, 200000);
+
+      controller.selection = const CodeLineSelection.collapsed(index: 0, offset: 100000);
+      controller.applyNewLine(); // split the long line in two
+      expect(controller.codeLines.length, 2);
+      expect(controller.codeLines[0].text.length, 100000);
+      expect(controller.codeLines[1].text.length, 100000);
+
+      controller.undo();
+      expect(controller.codeLines.length, 1);
+      expect(controller.codeLines[0].text.length, 200000);
+    });
+  });
 }
