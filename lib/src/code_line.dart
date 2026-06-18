@@ -50,11 +50,11 @@ abstract class CodeLineEditingController extends ValueNotifier<CodeLineEditingVa
   /// Also, you can use [spanBuilder] to customize and override the code line style.
   ///
   factory CodeLineEditingController({
-    CodeLines codeLines = _kInitialCodeLines,
+    CodeLines? codeLines,
     CodeLineOptions options = const CodeLineOptions(),
     CodeLineSpanBuilder? spanBuilder,
   }) => _CodeLineEditingControllerImpl(
-    codeLines: codeLines,
+    codeLines: codeLines ?? _kInitialCodeLines,
     options: options,
     spanBuilder: spanBuilder,
   );
@@ -550,7 +550,7 @@ class CodeLineEditingValue {
     this.extraSelections = const <CodeLineSelection>[],
   });
 
-  const CodeLineEditingValue.empty() : this(
+  CodeLineEditingValue.empty() : this(
     codeLines: _kInitialCodeLines
   );
 

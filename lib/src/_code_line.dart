@@ -1,10 +1,6 @@
 part of re_editor;
 
-const CodeLines _kInitialCodeLines = CodeLines([
-  CodeLineSegment(codeLines: [
-    CodeLine.empty
-  ])
-]);
+final CodeLines _kInitialCodeLines = CodeLines.of(const <CodeLine>[CodeLine.empty]);
 
 const int _kUnitCodeWhitespace = 0x20;
 const List<String> _kClosures = ['{}', '[]', '()'];
@@ -1403,61 +1399,15 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   bool _multiCaretActive = false;
 
   /// Flat character offset of (line [index], [offset]) in the whole document,
-  /// counting one line break per line. Whole segments are skipped via their
-  /// cached `charCount`/`length` (O(1) each), so this is O(segments + segSize),
-  /// not O(doc) — and never the O(doc^2) that indexing `codeLines[i]` in a loop
-  /// would cost (`CodeLines.operator[]` is itself an O(segments) walk).
+  /// counting one line break per line. O(log N) via the buffer's prefix sums.
   int _flatOffsetOf(int index, int offset) {
-    final int br = lineBreak.value.length;
-    int o = 0;
-    int seen = 0;
-    for (final CodeLineSegment segment in codeLines.segments) {
-      final int segLen = segment.length;
-      if (seen + segLen <= index) {
-        o += segment.charCount + segLen * br;
-        seen += segLen;
-      } else {
-        final List<CodeLine> lines = segment.codeLines;
-        final int stop = index - seen;
-        for (int j = 0; j < stop; j++) {
-          o += lines[j].charCount + br;
-        }
-        return o + offset;
-      }
-    }
-    return o + offset;
+    return codeLines.charCountBefore(index) + index * lineBreak.value.length + offset;
   }
 
-  /// Inverse of [_flatOffsetOf]: maps a flat offset to (lineIndex, offsetInLine).
-  /// Skips whole earlier segments via their cached flat span; walks line-by-line
-  /// only inside the target (and last) segment, so the last-line clamp holds.
+  /// Inverse of [_flatOffsetOf]: maps a flat offset to (lineIndex, offsetInLine),
+  /// clamping into the last line. O(log N) via [CodeLines.lineOffsetForFlat].
   (int, int) _indexOffsetOfFlat(int target) {
-    final int br = lineBreak.value.length;
-    final int lastIndex = codeLines.length - 1;
-    final List<CodeLineSegment> segments = codeLines.segments;
-    int start = 0;
-    int index = 0;
-    for (int s = 0; s < segments.length; s++) {
-      final CodeLineSegment segment = segments[s];
-      final int segLen = segment.length;
-      final int segFlat = segment.charCount + segLen * br;
-      if (start + segFlat <= target && s < segments.length - 1) {
-        start += segFlat;
-        index += segLen;
-        continue;
-      }
-      final List<CodeLine> lines = segment.codeLines;
-      for (int j = 0; j < segLen; j++) {
-        final int cc = lines[j].charCount;
-        final int end = start + cc + br;
-        if (target < end || index == lastIndex) {
-          return (index, (target - start).clamp(0, cc));
-        }
-        start = end;
-        index++;
-      }
-    }
-    return (lastIndex < 0 ? 0 : lastIndex, 0);
+    return codeLines.lineOffsetForFlat(target, lineBreak.value.length);
   }
 
   /// Total document length in the same per-line convention as [_flatOffsetOf],

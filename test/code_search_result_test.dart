@@ -4,29 +4,29 @@ import 'package:re_editor/re_editor.dart';
 void main() {
   group('CodeFindResult getter ', () {
     test('`previous & next & current`', () async {
-      const CodeFindResult result = CodeFindResult(
+      final CodeFindResult result = CodeFindResult(
         index: 0,
         matches: [
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 0,
             baseOffset: 1,
             extentIndex: 0,
             extentOffset: 2
           ),
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 1,
             baseOffset: 1,
             extentIndex: 1,
             extentOffset: 2
           ),
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 2,
             baseOffset: 1,
             extentIndex: 2,
             extentOffset: 2
           )
         ],
-        option: CodeFindOption(
+        option: const CodeFindOption(
           pattern: '',
           caseSensitive: false,
           regex: false,
@@ -99,29 +99,29 @@ void main() {
 
   group('CodeFindResult method ', () {
     test('`copyWith`', () async {
-      const CodeFindResult result = CodeFindResult(
+      final CodeFindResult result = CodeFindResult(
         index: 0,
         matches: [
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 0,
             baseOffset: 1,
             extentIndex: 0,
             extentOffset: 2
           ),
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 1,
             baseOffset: 1,
             extentIndex: 1,
             extentOffset: 2
           ),
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 2,
             baseOffset: 1,
             extentIndex: 2,
             extentOffset: 2
           )
         ],
-        option: CodeFindOption(
+        option: const CodeFindOption(
           pattern: '',
           caseSensitive: false,
           regex: false,
@@ -132,29 +132,29 @@ void main() {
       expect(result.copyWith(), result);
       expect(result.copyWith(
         index: 1
-      ), const CodeFindResult(
+      ), CodeFindResult(
         index: 1,
         matches: [
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 0,
             baseOffset: 1,
             extentIndex: 0,
             extentOffset: 2
           ),
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 1,
             baseOffset: 1,
             extentIndex: 1,
             extentOffset: 2
           ),
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 2,
             baseOffset: 1,
             extentIndex: 2,
             extentOffset: 2
           )
         ],
-        option: CodeFindOption(
+        option: const CodeFindOption(
           pattern: '',
           caseSensitive: false,
           regex: false,
@@ -164,10 +164,10 @@ void main() {
       ));
       expect(result.copyWith(
         matches: []
-      ), const CodeFindResult(
+      ), CodeFindResult(
         index: 0,
         matches: [],
-        option: CodeFindOption(
+        option: const CodeFindOption(
           pattern: '',
           caseSensitive: false,
           regex: false,
@@ -181,29 +181,29 @@ void main() {
           caseSensitive: true,
           regex: true,
         ),
-      ), const CodeFindResult(
+      ), CodeFindResult(
         index: 0,
         matches: [
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 0,
             baseOffset: 1,
             extentIndex: 0,
             extentOffset: 2
           ),
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 1,
             baseOffset: 1,
             extentIndex: 1,
             extentOffset: 2
           ),
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 2,
             baseOffset: 1,
             extentIndex: 2,
             extentOffset: 2
           )
         ],
-        option: CodeFindOption(
+        option: const CodeFindOption(
           pattern: 'a',
           caseSensitive: true,
           regex: true,
@@ -249,29 +249,29 @@ void main() {
       ));
       expect(result.copyWith(
         dirty: true
-      ), const CodeFindResult(
+      ), CodeFindResult(
         index: 0,
         matches: [
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 0,
             baseOffset: 1,
             extentIndex: 0,
             extentOffset: 2
           ),
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 1,
             baseOffset: 1,
             extentIndex: 1,
             extentOffset: 2
           ),
-          CodeLineSelection(
+          const CodeLineSelection(
             baseIndex: 2,
             baseOffset: 1,
             extentIndex: 2,
             extentOffset: 2
           )
         ],
-        option: CodeFindOption(
+        option: const CodeFindOption(
           pattern: '',
           caseSensitive: false,
           regex: false,

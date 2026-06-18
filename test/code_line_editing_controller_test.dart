@@ -8,7 +8,7 @@ void main() {
     test('`CodeLineEditingController()`', () {
       {
         final CodeLineEditingController controller = CodeLineEditingController();
-        expect(controller.value, const CodeLineEditingValue.empty());
+        expect(controller.value, CodeLineEditingValue.empty());
         expect(controller.options, const CodeLineOptions());
       }
       {
@@ -35,7 +35,7 @@ void main() {
             indentSize: 4
           )
         );
-        expect(controller.value, const CodeLineEditingValue.empty());
+        expect(controller.value, CodeLineEditingValue.empty());
         expect(controller.options, const CodeLineOptions(
           lineBreak: TextLineBreak.crlf,
           indentSize: 4
@@ -70,7 +70,7 @@ void main() {
     test('`CodeLineEditingController.fromText()`', () {
       {
         final CodeLineEditingController controller = CodeLineEditingController.fromText('');
-        expect(controller.value, const CodeLineEditingValue.empty());
+        expect(controller.value, CodeLineEditingValue.empty());
         expect(controller.options, const CodeLineOptions());
       }
       {
@@ -96,7 +96,7 @@ void main() {
   group('CodeLineEditingController setter & getter ', () {
     test('`value`', () {
       final CodeLineEditingController controller = CodeLineEditingController();
-      expect(controller.value, const CodeLineEditingValue.empty());
+      expect(controller.value, CodeLineEditingValue.empty());
       final CodeLineEditingValue value = CodeLineEditingValue(
         codeLines: CodeLines.of(const [
           CodeLine('abc'),

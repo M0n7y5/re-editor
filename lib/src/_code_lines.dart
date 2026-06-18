@@ -1,14 +1,10 @@
 part of re_editor;
 
 class _CodeLineSegmentQuckLineCount extends CodeLineSegment {
+  late final int _lineCount;
+  late final int _charCount;
 
-  late int _lineCount;
-  late int _charCount;
-
-  _CodeLineSegmentQuckLineCount({
-    required super.codeLines,
-    required super.dirty,
-  }) {
+  _CodeLineSegmentQuckLineCount({required super.codeLines}) {
     _lineCount = super.lineCount;
     _charCount = super.charCount;
   }
@@ -18,27 +14,4 @@ class _CodeLineSegmentQuckLineCount extends CodeLineSegment {
 
   @override
   int get charCount => _charCount;
-
-  @override
-  set length(int newLength) {
-    super.length = newLength;
-    _lineCount = super.lineCount;
-    _charCount = super.charCount;
-  }
-
-  @override
-  void add(CodeLine element) {
-    super.add(element);
-    _lineCount = super.lineCount;
-    _charCount = super.charCount;
-  }
-
-  @override
-  void operator []=(int index, CodeLine value) {
-    super[index] = value;
-    _lineCount = super.lineCount;
-    _charCount = super.charCount;
-  }
-
 }
-

@@ -6,12 +6,12 @@ void main() {
   group('CodeLines constructor ', () {
     test('`CodeLines()`', () {
       {
-        const CodeLines codeLines = CodeLines([]);
+        final CodeLines codeLines = CodeLines([]);
         expect(listEquals(codeLines.segments, const []), true);
       }
       {
-        const CodeLines codeLines = CodeLines([
-          CodeLineSegment(
+        final CodeLines codeLines = CodeLines([
+          const CodeLineSegment(
             codeLines: [
               CodeLine('abc'),
               CodeLine('foo'),
@@ -61,7 +61,6 @@ void main() {
         final CodeLines codeLines = CodeLines.of(List.generate(512, (index) => CodeLine('$index')));
         expect(codeLines.segments.length, 2);
         for (int i = 0; i < codeLines.segments.length; i++) {
-          expect(codeLines.segments[i].dirty, false);
           expect(codeLines.segments[i].first, CodeLine('${i * 256}'));
           expect(codeLines.segments[i].last, CodeLine('${(i + 1) * 256 - 1}'));
         }
@@ -74,8 +73,8 @@ void main() {
         expect(listEquals(codeLines.segments, const []), true);
       }
       {
-        final CodeLines codeLines = CodeLines.from(const CodeLines([
-          CodeLineSegment(
+        final CodeLines codeLines = CodeLines.from(CodeLines([
+          const CodeLineSegment(
             codeLines: [
               CodeLine('abc'),
               CodeLine('foo'),
@@ -90,23 +89,22 @@ void main() {
               CodeLine('foo'),
               CodeLine('bar')
             ],
-            dirty: true
           )
         ]), true);
       }
       {
-        final CodeLines codeLines = CodeLines.from(const CodeLines([
-          CodeLineSegment(
+        final CodeLines codeLines = CodeLines.from(CodeLines([
+          const CodeLineSegment(
             codeLines: [
               CodeLine('abc'),
             ]
           ),
-          CodeLineSegment(
+          const CodeLineSegment(
             codeLines: [
               CodeLine('foo'),
             ]
           ),
-          CodeLineSegment(
+          const CodeLineSegment(
             codeLines: [
               CodeLine('bar'),
             ]
@@ -117,19 +115,16 @@ void main() {
             codeLines: [
               CodeLine('abc'),
             ],
-            dirty: true
           ),
           CodeLineSegment(
             codeLines: [
               CodeLine('foo'),
             ],
-            dirty: true
           ),
           CodeLineSegment(
             codeLines: [
               CodeLine('bar'),
             ],
-            dirty: true
           )
         ]), true);
       }
@@ -345,22 +340,18 @@ void main() {
               CodeLine('foo'),
               CodeLine('bar')
             ]),
-            dirty: true
           )
         ]);
         codeLines[0] = const CodeLine('a');
-        expect(codeLines.segments.last.dirty, false);
       }
       {
         final CodeLines codeLines = CodeLines([
           CodeLineSegment(
             codeLines: List.generate(1024, (index) => CodeLine('$index')),
-            dirty: true
           )
         ]);
         codeLines[1023] = const CodeLine('a');
         expect(codeLines[1023], const CodeLine('a'));
-        expect(codeLines.segments.last.dirty, false);
       }
     });
 
@@ -379,86 +370,85 @@ void main() {
       ]) == CodeLines.of(const [
         CodeLine('abc')
       ]), false);
-      expect(const CodeLines([
-        CodeLineSegment(
+      expect(CodeLines([
+        const CodeLineSegment(
           codeLines: [
             CodeLine('abc')
           ]
         )
-      ]) == const CodeLines([
-        CodeLineSegment(
+      ]) == CodeLines([
+        const CodeLineSegment(
           codeLines: [
             CodeLine('abc')
           ]
         )
       ]), true);
-      expect(const CodeLines([
-        CodeLineSegment(
+      expect(CodeLines([
+        const CodeLineSegment(
           codeLines: [
             CodeLine('abc')
           ]
         ),
-        CodeLineSegment(
+        const CodeLineSegment(
           codeLines: [
             CodeLine('foo')
           ]
         ),
-        CodeLineSegment(
+        const CodeLineSegment(
           codeLines: [
             CodeLine('bar')
           ]
         )
-      ]) == const CodeLines([
-        CodeLineSegment(
+      ]) == CodeLines([
+        const CodeLineSegment(
           codeLines: [
             CodeLine('abc')
           ]
         ),
-        CodeLineSegment(
+        const CodeLineSegment(
           codeLines: [
             CodeLine('foo')
           ]
         ),
-        CodeLineSegment(
+        const CodeLineSegment(
           codeLines: [
             CodeLine('bar')
           ]
         )
       ]), true);
-      expect(const CodeLines([
-        CodeLineSegment(
+      expect(CodeLines([
+        const CodeLineSegment(
           codeLines: [
             CodeLine('abc')
           ],
-          dirty: true
         ),
-        CodeLineSegment(
+        const CodeLineSegment(
           codeLines: [
             CodeLine('foo')
           ]
         ),
-        CodeLineSegment(
+        const CodeLineSegment(
           codeLines: [
             CodeLine('bar')
           ]
         )
-      ]) == const CodeLines([
-        CodeLineSegment(
+      ]) == CodeLines([
+        const CodeLineSegment(
           codeLines: [
             CodeLine('abc')
           ]
         ),
-        CodeLineSegment(
+        const CodeLineSegment(
           codeLines: [
             CodeLine('foo')
           ]
         ),
-        CodeLineSegment(
+        const CodeLineSegment(
           codeLines: [
             CodeLine('bar')
           ]
         )
-      ]), false);
+      ]), true);
     });
   });
 
@@ -497,7 +487,6 @@ void main() {
             codeLines: List.of(const [
               CodeLine('abc')
             ]),
-            dirty: true
           )
         ]);
         codeLines.add(const CodeLine('foo'));
@@ -505,7 +494,6 @@ void main() {
         expect(codeLines.length, 3);
         expect(codeLines.first, const CodeLine('abc'));
         expect(codeLines.last, const CodeLine('bar'));
-        expect(codeLines.segments.last.dirty, false);
       }
     });
 
@@ -530,10 +518,7 @@ void main() {
         codeLines.addAll(List.generate(512, (index) => CodeLine('$index')));
         expect(codeLines.length, 513);
         expect(codeLines.last, const CodeLine('511'));
-        expect(codeLines.segments.length, 3);
-        expect(codeLines.segments[0].length, 256);
-        expect(codeLines.segments[1].length, 256);
-        expect(codeLines.segments[2].length, 1);
+        expect(codeLines.toList(), [const CodeLine('abc'), ...List.generate(512, (index) => CodeLine('$index'))]);
       }
       {
         final CodeLines codeLines = CodeLines([
@@ -541,19 +526,12 @@ void main() {
             codeLines: List.of(const [
               CodeLine('abc')
             ]),
-            dirty: true
           )
         ]);
         codeLines.addAll(List.generate(512, (index) => CodeLine('$index')));
         expect(codeLines.length, 513);
         expect(codeLines.last, const CodeLine('511'));
-        expect(codeLines.segments.length, 3);
-        expect(codeLines.segments[0].length, 256);
-        expect(codeLines.segments[0].dirty, false);
-        expect(codeLines.segments[1].length, 256);
-        expect(codeLines.segments[1].dirty, false);
-        expect(codeLines.segments[2].length, 1);
-        expect(codeLines.segments[2].dirty, false);
+        expect(codeLines.toList(), [const CodeLine('abc'), ...List.generate(512, (index) => CodeLine('$index'))]);
       }
     });
 
@@ -564,18 +542,11 @@ void main() {
           CodeLine('abc')
         ]);
         codeLines1.addFrom(codeLines2, 0);
-        expect(listEquals(codeLines1.segments, const [
-          CodeLineSegment(
-            codeLines: [
-              CodeLine('abc')
-            ],
-            dirty: true
-          )
-        ]), true);
+        expect(codeLines1.toList(), const [CodeLine('abc')]);
       }
       {
-        const CodeLines codeLines1 = CodeLines([
-          CodeLineSegment(
+        final CodeLines codeLines1 = CodeLines([
+          const CodeLineSegment(
             codeLines: [
               CodeLine('abc'),
               CodeLine('foo'),
@@ -591,26 +562,9 @@ void main() {
           )
         ]);
         codeLines2.addFrom(codeLines1, 1, 2);
-        expect(listEquals(codeLines2.segments, const [
-          CodeLineSegment(
-            codeLines: [
-              CodeLine('123'),
-              CodeLine('foo')
-            ],
-          ),
-        ]), true);
+        expect(codeLines2.toList(), const [CodeLine('123'), CodeLine('foo')]);
         codeLines2.addFrom(codeLines1, 0);
-        expect(listEquals(codeLines2.segments, const [
-          CodeLineSegment(
-            codeLines: [
-              CodeLine('123'),
-              CodeLine('foo'),
-              CodeLine('abc'),
-              CodeLine('foo'),
-              CodeLine('bar')
-            ],
-          ),
-        ]), true);
+        expect(codeLines2.toList(), const [CodeLine('123'), CodeLine('foo'), CodeLine('abc'), CodeLine('foo'), CodeLine('bar')]);
       }
       {
         final CodeLines codeLines1 = CodeLines.of(const [
@@ -618,21 +572,7 @@ void main() {
         ]);
         final CodeLines codeLines2 = CodeLines.of(List.generate(512, (index) => CodeLine('$index')));
         codeLines1.addFrom(codeLines2, 0);
-        expect(listEquals(codeLines1.segments, [
-          const CodeLineSegment(
-            codeLines: [
-              CodeLine('abc')
-            ],
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('$index')),
-            dirty: true
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 256}')),
-            dirty: true
-          ),
-        ]), true);
+        expect(codeLines1.toList(), [const CodeLine('abc'), ...List.generate(512, (index) => CodeLine('$index'))]);
       }
       {
         final CodeLines codeLines1 = CodeLines.of(const [
@@ -659,25 +599,7 @@ void main() {
           ),
         ]);
         codeLines1.addFrom(codeLines2, 0);
-        expect(listEquals(codeLines1.segments, [
-          const CodeLineSegment(
-            codeLines: [
-              CodeLine('abc'),
-              CodeLine('foo'),
-              CodeLine('bar'),
-            ],
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('$index')),
-            dirty: true
-          ),
-          const CodeLineSegment(
-            codeLines: [
-              CodeLine('abc')
-            ],
-            dirty: true
-          ),
-        ]), true);
+        expect(codeLines1.toList(), [const CodeLine('abc'), const CodeLine('foo'), const CodeLine('bar'), ...List.generate(256, (index) => CodeLine('$index')), const CodeLine('abc')]);
       }
     });
 
@@ -758,18 +680,18 @@ void main() {
         CodeLine('bar'),
         CodeLine('foo'),
       ])), false);
-      expect(const CodeLines([
-        CodeLineSegment(
+      expect(CodeLines([
+        const CodeLineSegment(
           codeLines: [
             CodeLine('abc'),
           ],
         ),
-        CodeLineSegment(
+        const CodeLineSegment(
           codeLines: [
             CodeLine('foo'),
           ],
         ),
-        CodeLineSegment(
+        const CodeLineSegment(
           codeLines: [
             CodeLine('bar'),
           ],
@@ -793,10 +715,10 @@ void main() {
           CodeLine('abc')
         ]);
         expect(codeLines.sublines(0).equals(codeLines), true);
-        expect(codeLines.sublines(0) != codeLines, true);
+        expect(identical(codeLines.sublines(0), codeLines), false);
         expect(codeLines.sublines(1), CodeLines.empty());
         expect(codeLines.sublines(0, 1).equals(codeLines), true);
-        expect(codeLines.sublines(0, 1) != codeLines, true);
+        expect(identical(codeLines.sublines(0, 1), codeLines), false);
         expect(() => codeLines.sublines(2), throwsA(isA<RangeError>()));
         expect(() => codeLines.sublines(0, 2), throwsA(isA<RangeError>()));
         expect(() => codeLines.sublines(1, 2), throwsA(isA<RangeError>()));
@@ -808,110 +730,19 @@ void main() {
           CodeLine('bar')
         ]);
         expect(codeLines.sublines(0).equals(codeLines), true);
-        expect(codeLines.sublines(0) != codeLines, true);
-        expect(codeLines.sublines(1), const CodeLines([
-          CodeLineSegment(
-            codeLines: [
-              CodeLine('foo'),
-              CodeLine('bar')
-            ],
-          )
-        ]));
-        expect(codeLines.sublines(0, 1), const CodeLines([
-          CodeLineSegment(
-            codeLines: [
-              CodeLine('abc'),
-            ],
-          )
-        ]));
-        expect(codeLines.sublines(0, 2), const CodeLines([
-          CodeLineSegment(
-            codeLines: [
-              CodeLine('abc'),
-              CodeLine('foo'),
-            ],
-          )
-        ]));
-        expect(codeLines.sublines(1, 2), const CodeLines([
-          CodeLineSegment(
-            codeLines: [
-              CodeLine('foo'),
-            ],
-          )
-        ]));
-        expect(codeLines.sublines(2, 3), const CodeLines([
-          CodeLineSegment(
-            codeLines: [
-              CodeLine('bar'),
-            ],
-          )
-        ]));
-        expect(codeLines.sublines(0, 3), const CodeLines([
-          CodeLineSegment(
-            codeLines: [
-              CodeLine('abc'),
-              CodeLine('foo'),
-              CodeLine('bar')
-            ],
-            dirty: true
-          )
-        ]));
+        expect(identical(codeLines.sublines(0), codeLines), false);
+        expect(codeLines.sublines(1).toList(), const [CodeLine('foo'), CodeLine('bar')]);
+        expect(codeLines.sublines(0, 1).toList(), const [CodeLine('abc')]);
+        expect(codeLines.sublines(0, 2).toList(), const [CodeLine('abc'), CodeLine('foo')]);
+        expect(codeLines.sublines(1, 2).toList(), const [CodeLine('foo')]);
+        expect(codeLines.sublines(2, 3).toList(), const [CodeLine('bar')]);
+        expect(codeLines.sublines(0, 3).toList(), const [CodeLine('abc'), CodeLine('foo'), CodeLine('bar')]);
         expect(() => codeLines.sublines(4), throwsA(isA<RangeError>()));
       }
       {
         final CodeLines codeLines = CodeLines.of(List.generate(3000, (index) => CodeLine('$index')));
-        expect(codeLines.sublines(512, 1024 + 512), CodeLines([
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 512}')),
-            dirty: true
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 512 + 256 * 1}')),
-            dirty: true
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 512 + 256 * 2}')),
-            dirty: true
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 512 + 256 * 3}')),
-            dirty: true
-          )
-        ]));
-        expect(codeLines.sublines(512, 2048 + 512), CodeLines([
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 512}')),
-            dirty: true
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 512 + 256 * 1}')),
-            dirty: true
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 512 + 256 * 2}')),
-            dirty: true
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 512 + 256 * 3}')),
-            dirty: true
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 512 + 256 * 4}')),
-            dirty: true
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 512 + 256 * 5}')),
-            dirty: true
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 512 + 256 * 6}')),
-            dirty: true
-          ),
-          CodeLineSegment(
-            codeLines: List.generate(256, (index) => CodeLine('${index + 512 + 256 * 7}')),
-            dirty: true
-          )
-        ]));
+        expect(codeLines.sublines(512, 1024 + 512).toList(), List.generate(1024, (index) => CodeLine('${index + 512}')));
+        expect(codeLines.sublines(512, 2048 + 512).toList(), List.generate(2048, (index) => CodeLine('${index + 512}')));
       }
     });
 
@@ -962,18 +793,18 @@ void main() {
       }
       // Multi code lines in different segments
       {
-        const CodeLines codeLines = CodeLines([
-          CodeLineSegment(
+        final CodeLines codeLines = CodeLines([
+          const CodeLineSegment(
             codeLines: [
               CodeLine('abc'),
             ],
           ),
-          CodeLineSegment(
+          const CodeLineSegment(
             codeLines: [
               CodeLine('foo'),
             ],
           ),
-          CodeLineSegment(
+          const CodeLineSegment(
             codeLines: [
               CodeLine('bar')
             ],
@@ -1026,18 +857,18 @@ void main() {
       }
       // Multi code lines in different segments
       {
-        const CodeLines codeLines = CodeLines([
-          CodeLineSegment(
+        final CodeLines codeLines = CodeLines([
+          const CodeLineSegment(
             codeLines: [
               CodeLine('abc'),
             ],
           ),
-          CodeLineSegment(
+          const CodeLineSegment(
             codeLines: [
               CodeLine('foo'),
             ],
           ),
-          CodeLineSegment(
+          const CodeLineSegment(
             codeLines: [
               CodeLine('bar')
             ],

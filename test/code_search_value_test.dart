@@ -23,7 +23,7 @@ void main() {
             index: 0, 
             matches: [], 
             option: value.option, 
-            codeLines: const CodeLines([]),
+            codeLines: CodeLines([]),
             dirty: false
           )
         );
@@ -31,7 +31,7 @@ void main() {
           index: 0, 
           matches: [], 
           option: value.option, 
-          codeLines: const CodeLines([]),
+          codeLines: CodeLines([]),
           dirty: false
         ));
         expect(newValue.replaceMode, value.replaceMode); 
@@ -68,8 +68,8 @@ void main() {
   });
   group('CodeFindValue operator ', () {
     test('`==`', () async {
-      expect(const CodeFindValue(
-        option: CodeFindOption(
+      expect(CodeFindValue(
+        option: const CodeFindOption(
           pattern: '',
           caseSensitive: false,
           regex: false,
@@ -78,7 +78,7 @@ void main() {
         result: CodeFindResult(
           index: 0, 
           matches: [], 
-          option: CodeFindOption(
+          option: const CodeFindOption(
             pattern: '',
             caseSensitive: false,
             regex: false,
@@ -86,8 +86,8 @@ void main() {
           codeLines: CodeLines([]),
           dirty: false
         )
-      ) == const CodeFindValue(
-        option: CodeFindOption(
+      ) == CodeFindValue(
+        option: const CodeFindOption(
           pattern: '',
           caseSensitive: false,
           regex: false,
@@ -96,7 +96,7 @@ void main() {
         result: CodeFindResult(
           index: 0, 
           matches: [], 
-          option: CodeFindOption(
+          option: const CodeFindOption(
             pattern: '',
             caseSensitive: false,
             regex: false,
@@ -105,8 +105,8 @@ void main() {
           dirty: false
         )
       ), true);
-      expect(const CodeFindValue(
-        option: CodeFindOption(
+      expect(CodeFindValue(
+        option: const CodeFindOption(
           pattern: '',
           caseSensitive: false,
           regex: false,
@@ -115,7 +115,7 @@ void main() {
         result: CodeFindResult(
           index: 0, 
           matches: [], 
-          option: CodeFindOption(
+          option: const CodeFindOption(
             pattern: '',
             caseSensitive: false,
             regex: false,
@@ -123,8 +123,8 @@ void main() {
           codeLines: CodeLines([]),
           dirty: false
         )
-      ) == const CodeFindValue(
-        option: CodeFindOption(
+      ) == CodeFindValue(
+        option: const CodeFindOption(
           pattern: 'a',
           caseSensitive: false,
           regex: false,
@@ -133,7 +133,7 @@ void main() {
         result: CodeFindResult(
           index: 0, 
           matches: [], 
-          option: CodeFindOption(
+          option: const CodeFindOption(
             pattern: '',
             caseSensitive: false,
             regex: false,
@@ -142,8 +142,8 @@ void main() {
           dirty: false
         )
       ), false);
-      expect(const CodeFindValue(
-        option: CodeFindOption(
+      expect(CodeFindValue(
+        option: const CodeFindOption(
           pattern: '',
           caseSensitive: false,
           regex: false,
@@ -152,7 +152,7 @@ void main() {
         result: CodeFindResult(
           index: 0, 
           matches: [], 
-          option: CodeFindOption(
+          option: const CodeFindOption(
             pattern: '',
             caseSensitive: false,
             regex: false,
@@ -160,8 +160,8 @@ void main() {
           codeLines: CodeLines([]),
           dirty: false
         )
-      ) == const CodeFindValue(
-        option: CodeFindOption(
+      ) == CodeFindValue(
+        option: const CodeFindOption(
           pattern: '',
           caseSensitive: false,
           regex: false,
@@ -170,7 +170,7 @@ void main() {
         result: CodeFindResult(
           index: 0, 
           matches: [], 
-          option: CodeFindOption(
+          option: const CodeFindOption(
             pattern: '',
             caseSensitive: false,
             regex: false,
@@ -179,8 +179,8 @@ void main() {
           dirty: false
         )
       ), false);
-      expect(const CodeFindValue(
-        option: CodeFindOption(
+      expect(CodeFindValue(
+        option: const CodeFindOption(
           pattern: '',
           caseSensitive: false,
           regex: false,
@@ -189,7 +189,7 @@ void main() {
         result: CodeFindResult(
           index: 0, 
           matches: [], 
-          option: CodeFindOption(
+          option: const CodeFindOption(
             pattern: '',
             caseSensitive: false,
             regex: false,
@@ -197,8 +197,8 @@ void main() {
           codeLines: CodeLines([]),
           dirty: false
         )
-      ) == const CodeFindValue(
-        option: CodeFindOption(
+      ) == CodeFindValue(
+        option: const CodeFindOption(
           pattern: '',
           caseSensitive: false,
           regex: false,
@@ -207,7 +207,7 @@ void main() {
         result: CodeFindResult(
           index: 1, 
           matches: [], 
-          option: CodeFindOption(
+          option: const CodeFindOption(
             pattern: '',
             caseSensitive: false,
             regex: false,

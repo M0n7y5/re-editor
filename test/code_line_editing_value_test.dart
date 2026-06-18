@@ -47,7 +47,7 @@ void main() {
     });
 
     test('`CodeLineEditingValue.empty()`', () {
-      const CodeLineEditingValue value = CodeLineEditingValue.empty();
+      final CodeLineEditingValue value = CodeLineEditingValue.empty();
       expect(value.codeLines, CodeLines.of(const [
         CodeLine.empty
       ]));
