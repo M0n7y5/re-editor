@@ -13,7 +13,7 @@ dependencies:
   flutter:
     sdk: flutter
   re_highlight: ^0.0.3
-  isolate_manager: ^4.1.5+1
+  isolate_manager: ^6.3.2
   nok_tree_sitter:
     path: ../nok_tree_sitter
 
