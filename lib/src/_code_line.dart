@@ -1,19 +1,22 @@
 part of re_editor;
 
-final CodeLines _kInitialCodeLines = CodeLines.of(const <CodeLine>[CodeLine.empty]);
+final CodeLines _kInitialCodeLines = CodeLines.of(const <CodeLine>[
+  CodeLine.empty,
+]);
 
 const int _kUnitCodeWhitespace = 0x20;
 const List<String> _kClosures = ['{}', '[]', '()'];
 const List<String> _kClosureAndQuates = ['{}', '[]', '()', '\'\'', '""', '``'];
 
-class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue> implements CodeLineEditingController {
-
+class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
+    implements CodeLineEditingController {
   @override
   final CodeLineOptions options;
   final CodeLineSpanBuilder? spanBuilder;
   late final _CodeLineEditingCache _cache;
   late int _preEditLineIndex;
   CodeLineEditingValue? _preValue;
+
   /// Non-null only while [_runBatched] is active: stages `value` writes during
   /// a multi-caret pass so each assignment skips the two O(doc) `CodeLines`
   /// equality scans (ValueNotifier setter + undo-cache listener) and the
@@ -30,22 +33,25 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     _preEditLineIndex = -1;
   }
 
-  factory _CodeLineEditingControllerImpl.fromText(String? text, [
-    CodeLineOptions options = const CodeLineOptions()
+  factory _CodeLineEditingControllerImpl.fromText(
+    String? text, [
+    CodeLineOptions options = const CodeLineOptions(),
   ]) {
     return _CodeLineEditingControllerImpl(
       codeLines: text?.codeLines ?? _kInitialCodeLines,
-      options: options
+      options: options,
     );
   }
 
-  factory _CodeLineEditingControllerImpl.fromTextAsync(String? text, [
-    CodeLineOptions options = const CodeLineOptions()
+  factory _CodeLineEditingControllerImpl.fromTextAsync(
+    String? text, [
+    CodeLineOptions options = const CodeLineOptions(),
   ]) {
-    final _CodeLineEditingControllerImpl controller = _CodeLineEditingControllerImpl(
-      codeLines: _kInitialCodeLines,
-      options: options
-    );
+    final _CodeLineEditingControllerImpl controller =
+        _CodeLineEditingControllerImpl(
+          codeLines: _kInitialCodeLines,
+          options: options,
+        );
     if (text != null && text.isNotEmpty) {
       text.codeLinesAsync.then((value) => controller.codeLines = value);
     }
@@ -90,7 +96,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   @override
   set codeLines(CodeLines newCodeLines) {
     value = value.copyWith(
-      codeLines: newCodeLines.isEmpty ? _kInitialCodeLines : newCodeLines
+      codeLines: newCodeLines.isEmpty ? _kInitialCodeLines : newCodeLines,
     );
   }
 
@@ -104,9 +110,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   set composing(TextRange newComposing) {
-    value = value.copyWith(
-      composing: newComposing
-    );
+    value = value.copyWith(composing: newComposing);
   }
 
   TextLineBreak get lineBreak => options.lineBreak;
@@ -185,7 +189,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     }
     return selection.copyWith(
       baseIndex: baseRawIndex,
-      extentIndex: extentRawIndex
+      extentIndex: extentRawIndex,
     );
   }
 
@@ -193,8 +197,11 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   bool get isEmpty => codeLines == _kInitialCodeLines;
 
   @override
-  bool get isAllSelected => selection.start.index == 0 && selection.start.offset == 0 &&
-    selection.end.index == codeLines.length - 1 && selection.end.offset == codeLines.last.length;
+  bool get isAllSelected =>
+      selection.start.index == 0 &&
+      selection.start.offset == 0 &&
+      selection.end.index == codeLines.length - 1 &&
+      selection.end.offset == codeLines.last.length;
 
   @override
   bool get canUndo => _cache.canUndo;
@@ -205,23 +212,21 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   @override
   set text(String value) {
     runRevocableOp(() {
-      this.value = CodeLineEditingValue(
-        codeLines: value.codeLines
-      );
+      this.value = CodeLineEditingValue(codeLines: value.codeLines);
     });
   }
 
   @override
   set textAsync(String value) {
-    value.codeLinesAsync.then((value) {
-      runRevocableOp(() {
-        this.value = CodeLineEditingValue(
-          codeLines: value
-        );
-      });
-    }).onError((error, stackTrace) {
-      // Should not happen
-    });
+    value.codeLinesAsync
+        .then((value) {
+          runRevocableOp(() {
+            this.value = CodeLineEditingValue(codeLines: value);
+          });
+        })
+        .onError((error, stackTrace) {
+          // Should not happen
+        });
   }
 
   @override
@@ -240,7 +245,10 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       } else if (endText.isNotEmpty && !newValue.text.endsWith(endText)) {
         replacement = newValue.text;
       } else {
-        replacement = newValue.text.substring(beforeText.length, newValue.text.length - endText.length);
+        replacement = newValue.text.substring(
+          beforeText.length,
+          newValue.text.length - endText.length,
+        );
       }
       _replaceRange(replacement);
       return;
@@ -255,16 +263,18 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       } else {
         newCodeLines = CodeLines.from(codeLines);
         newCodeLines[selection.startIndex] = startLine.copyWith(
-          text: newValue.text
+          text: newValue.text,
         );
       }
       newSelection = newValue.selection;
       newComposing = newValue.composing;
     } else if (selection.baseIndex < selection.extentIndex) {
       newCodeLines = codeLines.sublines(0, selection.startIndex);
-      newCodeLines.add(endLine.copyWith(
-        text: newValue.text + endLine.substring(selection.endOffset)
-      ));
+      newCodeLines.add(
+        endLine.copyWith(
+          text: newValue.text + endLine.substring(selection.endOffset),
+        ),
+      );
       if (selection.endIndex + 1 < codeLines.length) {
         newCodeLines.addFrom(codeLines, selection.endIndex + 1);
       }
@@ -272,14 +282,16 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       newComposing = newValue.composing;
     } else {
       newCodeLines = codeLines.sublines(0, selection.startIndex);
-      newCodeLines.add(endLine.copyWith(
-        text: startLine.substring(0, selection.startOffset) + newValue.text
-      ));
+      newCodeLines.add(
+        endLine.copyWith(
+          text: startLine.substring(0, selection.startOffset) + newValue.text,
+        ),
+      );
       if (selection.endIndex + 1 < codeLines.length) {
         newCodeLines.addFrom(codeLines, selection.endIndex + 1);
       }
       newSelection = TextSelection.collapsed(
-        offset: selection.startOffset + newValue.selection.baseOffset
+        offset: selection.startOffset + newValue.selection.baseOffset,
       );
       if (newValue.composing.isValid) {
         newComposing = TextRange(
@@ -300,7 +312,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
         index: selection.startIndex,
         selection: newSelection,
       ),
-      composing: newComposing
+      composing: newComposing,
     );
     _cache.markNewRecord(false);
     makeCursorCenterIfInvisible();
@@ -333,22 +345,23 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       baseIndex: 0,
       baseOffset: 0,
       extentIndex: codeLines.length - 1,
-      extentOffset: codeLines.last.length
+      extentOffset: codeLines.last.length,
     );
   }
 
   @override
   void cancelSelection() {
     if (!selection.isCollapsed) {
-      selection = CodeLineSelection.fromPosition(
-        position: selection.extent
-      );
+      selection = CodeLineSelection.fromPosition(position: selection.extent);
       makeCursorCenterIfInvisible();
     }
   }
 
   @override
-  List<CodeLineSelection> get selections => <CodeLineSelection>[...value.extraSelections, value.selection];
+  List<CodeLineSelection> get selections => <CodeLineSelection>[
+    ...value.extraSelections,
+    value.selection,
+  ];
 
   @override
   void addSelection(CodeLineSelection selection) {
@@ -361,7 +374,10 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       }
     }
     value = value.copyWith(
-      extraSelections: <CodeLineSelection>[...value.extraSelections, value.selection],
+      extraSelections: <CodeLineSelection>[
+        ...value.extraSelections,
+        value.selection,
+      ],
       selection: selection,
     );
     _revealPrimaryCaret();
@@ -378,7 +394,10 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   @override
   void addSelectionFromNextOccurrence() {
     if (selection.isCollapsed) {
-      final CodeLineSelection? word = _wordRangeAt(selection.extentIndex, selection.extentOffset);
+      final CodeLineSelection? word = _wordRangeAt(
+        selection.extentIndex,
+        selection.extentOffset,
+      );
       if (word == null) {
         return;
       }
@@ -386,8 +405,14 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       return;
     }
     final String doc = text;
-    final int lo = _flatOffsetOf(selection.startIndex, selection.startOffset).clamp(0, doc.length);
-    final int hi = _flatOffsetOf(selection.endIndex, selection.endOffset).clamp(0, doc.length);
+    final int lo = _flatOffsetOf(
+      selection.startIndex,
+      selection.startOffset,
+    ).clamp(0, doc.length);
+    final int hi = _flatOffsetOf(
+      selection.endIndex,
+      selection.endOffset,
+    ).clamp(0, doc.length);
     if (hi <= lo) {
       return;
     }
@@ -423,7 +448,10 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     CodeLineSelection primary = selection;
     final String needle;
     if (primary.isCollapsed) {
-      final CodeLineSelection? word = _wordRangeAt(primary.extentIndex, primary.extentOffset);
+      final CodeLineSelection? word = _wordRangeAt(
+        primary.extentIndex,
+        primary.extentOffset,
+      );
       if (word == null) {
         return;
       }
@@ -462,7 +490,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       return;
     }
     final int targetOffset = min(p.offset, codeLines[targetIndex].length);
-    addSelection(CodeLineSelection.collapsed(index: targetIndex, offset: targetOffset));
+    addSelection(
+      CodeLineSelection.collapsed(index: targetIndex, offset: targetOffset),
+    );
   }
 
   @override
@@ -487,20 +517,19 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void moveCursor(AxisDirection direction) {
-    if (!_multiCaretActive && _runForAllCarets(() => moveCursor(direction), revocable: false)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(() => moveCursor(direction), revocable: false)) {
       return;
     }
     switch (direction) {
       case AxisDirection.left:
         if (!selection.isCollapsed) {
-          selection = CodeLineSelection.fromPosition(
-            position: selection.start
-          );
+          selection = CodeLineSelection.fromPosition(position: selection.start);
         } else if (selection.extentIndex != 0 || selection.extentOffset != 0) {
           if (selection.baseAffinity != selection.extentAffinity) {
             selection = selection.copyWith(
               baseAffinity: TextAffinity.upstream,
-              extentAffinity: TextAffinity.upstream
+              extentAffinity: TextAffinity.upstream,
             );
           } else {
             final int index;
@@ -511,7 +540,12 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
             } else {
               index = selection.extentIndex;
               // Skip 1 character to left
-              offset = codeLines[index].substring(0, selection.extentOffset).characters.skipLast(1).string.length;
+              offset = codeLines[index]
+                  .substring(0, selection.extentOffset)
+                  .characters
+                  .skipLast(1)
+                  .string
+                  .length;
             }
             selection = CodeLineSelection.collapsed(
               index: index,
@@ -523,25 +557,30 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
         break;
       case AxisDirection.right:
         if (!selection.isCollapsed) {
-          selection = CodeLineSelection.fromPosition(
-            position: selection.end
-          );
-        } else if (selection.extentIndex != codeLines.length - 1 || selection.extentOffset != codeLines.last.length) {
+          selection = CodeLineSelection.fromPosition(position: selection.end);
+        } else if (selection.extentIndex != codeLines.length - 1 ||
+            selection.extentOffset != codeLines.last.length) {
           if (selection.baseAffinity != selection.extentAffinity) {
             selection = selection.copyWith(
               baseAffinity: TextAffinity.downstream,
-              extentAffinity: TextAffinity.downstream
+              extentAffinity: TextAffinity.downstream,
             );
           } else {
             final int index;
             final int offset;
-            if (selection.extentOffset == extentLine.length){
+            if (selection.extentOffset == extentLine.length) {
               index = selection.extentIndex + 1;
               offset = 0;
             } else {
               index = selection.extentIndex;
               // Skip 1 character to right
-              offset = selection.extentOffset + codeLines[index].substring(selection.extentOffset).characters.first.length;
+              offset =
+                  selection.extentOffset +
+                  codeLines[index]
+                      .substring(selection.extentOffset)
+                      .characters
+                      .first
+                      .length;
             }
             selection = CodeLineSelection.collapsed(
               index: index,
@@ -552,43 +591,40 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
         }
         break;
       case AxisDirection.up:
-        final CodeLinePosition? position = _render?.getUpPosition(selection.start);
+        final CodeLinePosition? position = _render?.getUpPosition(
+          selection.start,
+        );
         if (position != null) {
-          selection = CodeLineSelection.fromPosition(
-            position: position
-          );
+          selection = CodeLineSelection.fromPosition(position: position);
         } else {
           final CodeLinePosition current = selection.start;
           if (current.index == 0) {
-            selection = const CodeLineSelection.collapsed(
-              index: 0,
-              offset: 0
-            );
+            selection = const CodeLineSelection.collapsed(index: 0, offset: 0);
           } else {
             selection = CodeLineSelection.collapsed(
               index: current.index - 1,
-              offset: min(codeLines[current.index - 1].length, current.offset)
+              offset: min(codeLines[current.index - 1].length, current.offset),
             );
           }
         }
         break;
       case AxisDirection.down:
-        final CodeLinePosition? position = _render?.getDownPosition(selection.start);
+        final CodeLinePosition? position = _render?.getDownPosition(
+          selection.start,
+        );
         if (position != null) {
-          selection = CodeLineSelection.fromPosition(
-            position: position
-          );
+          selection = CodeLineSelection.fromPosition(position: position);
         } else {
           final CodeLinePosition current = selection.end;
           if (current.index == codeLines.length - 1) {
             selection = CodeLineSelection.collapsed(
               index: codeLines.length - 1,
-              offset: codeLines.last.length
+              offset: codeLines.last.length,
             );
           } else {
             selection = CodeLineSelection.collapsed(
               index: current.index + 1,
-              offset: min(codeLines[current.index + 1].length, current.offset)
+              offset: min(codeLines[current.index + 1].length, current.offset),
             );
           }
         }
@@ -599,7 +635,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void moveCursorToLineStart() {
-    if (!_multiCaretActive && _runForAllCarets(moveCursorToLineStart, revocable: false)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(moveCursorToLineStart, revocable: false)) {
       return;
     }
     final String current = extentLine.text;
@@ -616,29 +653,27 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     }
     selection = CodeLineSelection.collapsed(
       index: selection.extentIndex,
-      offset: offset
+      offset: offset,
     );
     makeCursorVisible();
   }
 
   @override
   void moveCursorToLineEnd() {
-    if (!_multiCaretActive && _runForAllCarets(moveCursorToLineEnd, revocable: false)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(moveCursorToLineEnd, revocable: false)) {
       return;
     }
     selection = CodeLineSelection.collapsed(
       index: selection.extentIndex,
-      offset: extentLine.length
+      offset: extentLine.length,
     );
     makeCursorVisible();
   }
 
   @override
   void moveCursorToPageStart() {
-    selection = const CodeLineSelection.collapsed(
-      index: 0,
-      offset: 0
-    );
+    selection = const CodeLineSelection.collapsed(index: 0, offset: 0);
     makeCursorVisible();
   }
 
@@ -646,7 +681,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   void moveCursorToPageEnd() {
     selection = CodeLineSelection.collapsed(
       index: codeLines.length - 1,
-      offset: codeLines.last.length
+      offset: codeLines.last.length,
     );
     makeCursorVisible();
   }
@@ -663,7 +698,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void moveCursorToWordBoundaryBackward() {
-    if (!_multiCaretActive && _runForAllCarets(moveCursorToWordBoundaryBackward, revocable: false)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(moveCursorToWordBoundaryBackward, revocable: false)) {
       return;
     }
     if (selection.extentOffset == 0) {
@@ -726,7 +762,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void moveCursorToWordBoundaryForward() {
-    if (!_multiCaretActive && _runForAllCarets(moveCursorToWordBoundaryForward, revocable: false)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(moveCursorToWordBoundaryForward, revocable: false)) {
       return;
     }
     if (selection.extentOffset == extentLine.text.length) {
@@ -736,10 +773,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
         return;
       }
 
-      selection = CodeLineSelection.collapsed(
-        index: newIndex,
-        offset: 0,
-      );
+      selection = CodeLineSelection.collapsed(index: newIndex, offset: 0);
       makeCursorVisible();
     }
 
@@ -783,7 +817,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void extendSelection(AxisDirection direction) {
-    if (!_multiCaretActive && _runForAllCarets(() => extendSelection(direction), revocable: false)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(() => extendSelection(direction), revocable: false)) {
       return;
     }
     switch (direction) {
@@ -796,77 +831,90 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
             offset = codeLines[index].length;
           } else {
             index = selection.extentIndex;
-            final Characters characters = extentLine.substring(0, selection.extentOffset).characters;
-            offset = selection.extentOffset - characters.takeLast(1).first.length;
+            final Characters characters = extentLine
+                .substring(0, selection.extentOffset)
+                .characters;
+            offset =
+                selection.extentOffset - characters.takeLast(1).first.length;
           }
           selection = selection.copyWith(
             extentIndex: index,
             extentOffset: offset,
-            extentAffinity: TextAffinity.downstream
+            extentAffinity: TextAffinity.downstream,
           );
         }
         break;
       case AxisDirection.right:
-        if (selection.extentIndex != codeLines.length - 1 || selection.extentOffset != codeLines.last.length) {
+        if (selection.extentIndex != codeLines.length - 1 ||
+            selection.extentOffset != codeLines.last.length) {
           final int index;
           final int offset;
-          if (selection.extentOffset == extentLine.length){
+          if (selection.extentOffset == extentLine.length) {
             index = selection.extentIndex + 1;
             offset = 0;
           } else {
-            final Characters characters = extentLine.substring(selection.extentOffset).characters;
+            final Characters characters = extentLine
+                .substring(selection.extentOffset)
+                .characters;
             index = selection.extentIndex;
             offset = selection.extentOffset + characters.elementAt(0).length;
           }
           selection = selection.copyWith(
             extentIndex: index,
             extentOffset: offset,
-            extentAffinity: TextAffinity.upstream
+            extentAffinity: TextAffinity.upstream,
           );
         }
         break;
       case AxisDirection.up:
-        final CodeLinePosition? position = _render?.getUpPosition(selection.extent);
+        final CodeLinePosition? position = _render?.getUpPosition(
+          selection.extent,
+        );
         if (position != null) {
           selection = selection.copyWith(
             extentIndex: position.index,
             extentOffset: position.offset,
-            extentAffinity: position.affinity
+            extentAffinity: position.affinity,
           );
         } else {
           final CodeLinePosition current = selection.extent;
           if (current.index == 0) {
-            selection = selection.copyWith(
-              extentIndex: 0,
-              extentOffset: 0
-            );
+            selection = selection.copyWith(extentIndex: 0, extentOffset: 0);
           } else {
             selection = selection.copyWith(
               extentIndex: current.index - 1,
-              extentOffset: min(codeLines[current.index - 1].length, current.offset)
+              extentOffset: min(
+                codeLines[current.index - 1].length,
+                current.offset,
+              ),
             );
           }
         }
         break;
       case AxisDirection.down:
-        final CodeLinePosition? position = _render?.getDownPosition(selection.extent);
+        final CodeLinePosition? position = _render?.getDownPosition(
+          selection.extent,
+        );
         if (position != null) {
           selection = selection.copyWith(
             extentIndex: position.index,
             extentOffset: position.offset,
-            extentAffinity: position.affinity
+            extentAffinity: position.affinity,
           );
         } else {
           final CodeLinePosition current = selection.extent;
           if (current.index == codeLines.length - 1) {
             selection = selection.copyWith(
               extentIndex: codeLines.length - 1,
-              extentOffset: codeLines.last.length
+              extentOffset: codeLines.last.length,
             );
           } else {
             selection = selection.copyWith(
               extentIndex: current.index + 1,
-              extentOffset: min(codeLines[current.index + 1].length, current.offset)
+              extentOffset: min(
+                codeLines[current.index + 1].length,
+                current.offset,
+              ),
             );
           }
         }
@@ -877,33 +925,30 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void extendSelectionToLineStart() {
-    if (!_multiCaretActive && _runForAllCarets(extendSelectionToLineStart, revocable: false)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(extendSelectionToLineStart, revocable: false)) {
       return;
     }
-    selection = selection.copyWith(
-      extentOffset: 0
-    );
+    selection = selection.copyWith(extentOffset: 0);
     makeCursorVisible();
   }
 
   @override
   void extendSelectionToLineEnd() {
-    if (!_multiCaretActive && _runForAllCarets(extendSelectionToLineEnd, revocable: false)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(extendSelectionToLineEnd, revocable: false)) {
       return;
     }
     selection = selection.copyWith(
       extentIndex: selection.extentIndex,
-      extentOffset: extentLine.length
+      extentOffset: extentLine.length,
     );
     makeCursorVisible();
   }
 
   @override
   void extendSelectionToPageStart() {
-    selection = selection.copyWith(
-      extentIndex: 0,
-      extentOffset: 0
-    );
+    selection = selection.copyWith(extentIndex: 0, extentOffset: 0);
     makeCursorVisible();
   }
 
@@ -911,14 +956,18 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   void extendSelectionToPageEnd() {
     selection = selection.copyWith(
       extentIndex: codeLines.length - 1,
-      extentOffset: codeLines.last.length
+      extentOffset: codeLines.last.length,
     );
     makeCursorVisible();
   }
 
   @override
   void extendSelectionToWordBoundaryForward() {
-    if (!_multiCaretActive && _runForAllCarets(extendSelectionToWordBoundaryForward, revocable: false)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(
+          extendSelectionToWordBoundaryForward,
+          revocable: false,
+        )) {
       return;
     }
     if (selection.extentOffset == 0) {
@@ -981,7 +1030,11 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void extendSelectionToWordBoundaryBackward() {
-    if (!_multiCaretActive && _runForAllCarets(extendSelectionToWordBoundaryBackward, revocable: false)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(
+          extendSelectionToWordBoundaryBackward,
+          revocable: false,
+        )) {
       return;
     }
     if (selection.extentOffset == extentLine.text.length) {
@@ -991,10 +1044,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
         return;
       }
 
-      selection = selection.copyWith(
-        extentIndex: newIndex,
-        extentOffset: 0,
-      );
+      selection = selection.copyWith(extentIndex: newIndex, extentOffset: 0);
       makeCursorVisible();
     }
 
@@ -1038,7 +1088,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void deleteLineForward() {
-    if (!_multiCaretActive && _runForAllCarets(deleteLineForward, revocable: true)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(deleteLineForward, revocable: true)) {
       return;
     }
     runRevocableOp(_deleteLineForward);
@@ -1046,7 +1097,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void deleteLineBackward() {
-    if (!_multiCaretActive && _runForAllCarets(deleteLineBackward, revocable: true)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(deleteLineBackward, revocable: true)) {
       return;
     }
     runRevocableOp(_deleteLineBackward);
@@ -1061,7 +1113,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void deleteSelection() {
-    if (!_multiCaretActive && _runForAllCarets(deleteSelection, revocable: true)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(deleteSelection, revocable: true)) {
       return;
     }
     runRevocableOp(_deleteSelection);
@@ -1069,7 +1122,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void deleteBackward() {
-    if (!_multiCaretActive && _runForAllCarets(deleteBackward, revocable: true)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(deleteBackward, revocable: true)) {
       return;
     }
     runRevocableOp(_deleteBackward);
@@ -1077,7 +1131,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void deleteForward() {
-    if (!_multiCaretActive && _runForAllCarets(deleteForward, revocable: true)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(deleteForward, revocable: true)) {
       return;
     }
     runRevocableOp(_deleteForward);
@@ -1085,7 +1140,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void deleteWordBackward() {
-    if (!_multiCaretActive && _runForAllCarets(deleteWordBackward, revocable: true)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(deleteWordBackward, revocable: true)) {
       return;
     }
     runRevocableOp(_deleteWordBackward);
@@ -1093,7 +1149,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void deleteWordForward() {
-    if (!_multiCaretActive && _runForAllCarets(deleteWordForward, revocable: true)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(deleteWordForward, revocable: true)) {
       return;
     }
     runRevocableOp(_deleteWordForward);
@@ -1125,7 +1182,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void transposeCharacters() {
-    if (!_multiCaretActive && _runForAllCarets(transposeCharacters, revocable: true)) {
+    if (!_multiCaretActive &&
+        _runForAllCarets(transposeCharacters, revocable: true)) {
       return;
     }
     runRevocableOp(_transposeCharacters);
@@ -1133,7 +1191,12 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void replaceSelection(String replacement, [CodeLineSelection? range]) {
-    if (range == null && !_multiCaretActive && _runForAllCarets(() => replaceSelection(replacement), revocable: true)) {
+    if (range == null &&
+        !_multiCaretActive &&
+        _runForAllCarets(
+          () => replaceSelection(replacement),
+          revocable: true,
+        )) {
       return;
     }
     runRevocableOp(() {
@@ -1159,7 +1222,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     final List<CodeLineSelection> all = selections;
     if (all.length <= 1) {
       if (selection.isCollapsed) {
-        return Clipboard.setData(ClipboardData(text: extentLine.text + lineBreak.value));
+        return Clipboard.setData(
+          ClipboardData(text: extentLine.text + lineBreak.value),
+        );
       } else {
         return Clipboard.setData(ClipboardData(text: selectedText));
       }
@@ -1220,16 +1285,21 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void collapseChunk(int start, int end) {
-    if (start < 0 || start >= codeLines.length || end <= start + 1 || end > codeLines.length) {
+    if (start < 0 ||
+        start >= codeLines.length ||
+        end <= start + 1 ||
+        end > codeLines.length) {
       return;
     }
     if (codeLines[start].chunkParent) {
       return;
     }
     final CodeLines newCodeLines = codeLines.sublines(0, start);
-    newCodeLines.add(codeLines[start].copyWith(
-      chunks: codeLines.sublines(start + 1, end).toList()
-    ));
+    newCodeLines.add(
+      codeLines[start].copyWith(
+        chunks: codeLines.sublines(start + 1, end).toList(),
+      ),
+    );
     if (end < codeLines.length) {
       newCodeLines.addFrom(codeLines, end);
     }
@@ -1263,14 +1333,14 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
         baseIndex: newStartIndex,
         baseOffset: newStartOffset,
         extentIndex: newEndIndex,
-        extentOffset: newEndOffset
+        extentOffset: newEndOffset,
       );
     } else {
       newSelection = selection.copyWith(
         baseIndex: newEndIndex,
         baseOffset: newEndOffset,
         extentIndex: newStartIndex,
-        extentOffset: newStartOffset
+        extentOffset: newStartOffset,
       );
     }
     final TextRange newComposing;
@@ -1282,7 +1352,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     value = value.copyWith(
       codeLines: newCodeLines,
       selection: newSelection,
-      composing: newComposing
+      composing: newComposing,
     );
   }
 
@@ -1292,9 +1362,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       return;
     }
     final CodeLines newCodeLines = codeLines.sublines(0, index);
-    newCodeLines.add(codeLines[index].copyWith(
-      chunks: const []
-    ));
+    newCodeLines.add(codeLines[index].copyWith(chunks: const []));
     final List<CodeLine> collapsedChunks = codeLines[index].chunks;
     newCodeLines.addAll(collapsedChunks);
     if (index + 1 < codeLines.length) {
@@ -1306,30 +1374,25 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     } else if (selection.startIndex <= index) {
       if (selection.baseIndex < selection.extentIndex) {
         newSelection = selection.copyWith(
-          extentIndex: selection.extentIndex + collapsedChunks.length
+          extentIndex: selection.extentIndex + collapsedChunks.length,
         );
       } else {
         newSelection = selection.copyWith(
-          baseIndex: selection.baseIndex + collapsedChunks.length
+          baseIndex: selection.baseIndex + collapsedChunks.length,
         );
       }
     } else {
       newSelection = selection.copyWith(
         baseIndex: selection.baseIndex + collapsedChunks.length,
-        extentIndex: selection.extentIndex + collapsedChunks.length
+        extentIndex: selection.extentIndex + collapsedChunks.length,
       );
     }
-    value = value.copyWith(
-      codeLines: newCodeLines,
-      selection: newSelection,
-    );
+    value = value.copyWith(codeLines: newCodeLines, selection: newSelection);
   }
 
   @override
   void clearComposing() {
-    value = value.copyWith(
-      composing: TextRange.empty
-    );
+    value = value.copyWith(composing: TextRange.empty);
   }
 
   @override
@@ -1341,7 +1404,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   int index2lineIndex(int index) => codeLines.index2lineIndex(index);
 
   @override
-  CodeLineIndex lineIndex2Index(int lineIndex) => codeLines.lineIndex2Index(lineIndex);
+  CodeLineIndex lineIndex2Index(int lineIndex) =>
+      codeLines.lineIndex2Index(lineIndex);
 
   @override
   void makeCursorCenterIfInvisible() {
@@ -1387,6 +1451,19 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   }
 
   @override
+  CodeLinePosition? hitTestText(Offset globalPosition) {
+    final _CodeFieldRender? render = _render;
+    if (render == null || !render.attached || !render.hasSize) {
+      return null;
+    }
+    final Offset local = render.globalToLocal(globalPosition);
+    if (!(Offset.zero & render.size).contains(local)) {
+      return null;
+    }
+    return render.calculateTextPosition(local);
+  }
+
+  @override
   void forceRepaint() {
     _render?.forceRepaint();
   }
@@ -1401,7 +1478,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   /// Flat character offset of (line [index], [offset]) in the whole document,
   /// counting one line break per line. O(log N) via the buffer's prefix sums.
   int _flatOffsetOf(int index, int offset) {
-    return codeLines.charCountBefore(index) + index * lineBreak.value.length + offset;
+    return codeLines.charCountBefore(index) +
+        index * lineBreak.value.length +
+        offset;
   }
 
   /// Inverse of [_flatOffsetOf]: maps a flat offset to (lineIndex, offsetInLine),
@@ -1458,12 +1537,13 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     if (carets.length <= 1) {
       return carets;
     }
-    final List<CodeLineSelection> sorted = [...carets]..sort((a, b) {
-      if (a.startIndex != b.startIndex) {
-        return a.startIndex - b.startIndex;
-      }
-      return a.startOffset - b.startOffset;
-    });
+    final List<CodeLineSelection> sorted = [...carets]
+      ..sort((a, b) {
+        if (a.startIndex != b.startIndex) {
+          return a.startIndex - b.startIndex;
+        }
+        return a.startOffset - b.startOffset;
+      });
     final List<CodeLineSelection> result = <CodeLineSelection>[sorted.first];
     for (int i = 1; i < sorted.length; i++) {
       final CodeLineSelection cur = sorted[i];
@@ -1471,7 +1551,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       if (prev == cur || prev.contains(cur)) {
         continue;
       }
-      if (_flatOffsetOf(prev.endIndex, prev.endOffset) >= _flatOffsetOf(cur.startIndex, cur.startOffset)) {
+      if (_flatOffsetOf(prev.endIndex, prev.endOffset) >=
+          _flatOffsetOf(cur.startIndex, cur.startOffset)) {
         result[result.length - 1] = CodeLineSelection(
           baseIndex: prev.startIndex,
           baseOffset: prev.startOffset,
@@ -1510,7 +1591,10 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   /// caret restored as the primary selection and shifted by the running
   /// length-delta of all earlier edits. Results are merged and committed as the
   /// new caret set. When [revocable] the whole pass is one undo node.
-  void _forEachCaret(void Function(int orderedIndex) op, {required bool revocable}) {
+  void _forEachCaret(
+    void Function(int orderedIndex) op, {
+    required bool revocable,
+  }) {
     final List<CodeLineSelection> all = selections;
     final int primaryIdx = all.length - 1;
     final List<({int baseFlat, int extentFlat, bool isPrimary})> entries = [];
@@ -1535,10 +1619,14 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       CodeLineSelection? newPrimary;
       try {
         for (int i = 0; i < entries.length; i++) {
-          final ({int baseFlat, int extentFlat, bool isPrimary}) entry = entries[i];
+          final ({int baseFlat, int extentFlat, bool isPrimary}) entry =
+              entries[i];
           final int len0 = _documentCharLength;
           value = value.copyWith(
-            selection: _selectionFromFlat(entry.baseFlat + delta, entry.extentFlat + delta),
+            selection: _selectionFromFlat(
+              entry.baseFlat + delta,
+              entry.extentFlat + delta,
+            ),
             extraSelections: const <CodeLineSelection>[],
           );
           op(i);
@@ -1551,16 +1639,21 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
         }
         final List<CodeLineSelection> merged = _mergeCarets(results);
         final CodeLineSelection primaryResult =
-            (newPrimary != null && merged.contains(newPrimary)) ? newPrimary : merged.last;
+            (newPrimary != null && merged.contains(newPrimary))
+            ? newPrimary
+            : merged.last;
         value = value.copyWith(
           selection: primaryResult,
-          extraSelections: merged.where((CodeLineSelection s) => s != primaryResult).toList(),
+          extraSelections: merged
+              .where((CodeLineSelection s) => s != primaryResult)
+              .toList(),
         );
       } finally {
         _multiCaretActive = wasActive;
       }
       makeCursorVisible();
     }
+
     if (revocable) {
       runRevocableOp(() => _runBatched(body));
     } else {
@@ -1571,8 +1664,14 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   /// Text of an arbitrary selection [sel] via flat offsets (multi-line included).
   String _selectionText(CodeLineSelection sel) {
     final String doc = text;
-    final int lo = _flatOffsetOf(sel.startIndex, sel.startOffset).clamp(0, doc.length);
-    final int hi = _flatOffsetOf(sel.endIndex, sel.endOffset).clamp(0, doc.length);
+    final int lo = _flatOffsetOf(
+      sel.startIndex,
+      sel.startOffset,
+    ).clamp(0, doc.length);
+    final int hi = _flatOffsetOf(
+      sel.endIndex,
+      sel.endOffset,
+    ).clamp(0, doc.length);
     return hi <= lo ? '' : doc.substring(lo, hi);
   }
 
@@ -1594,7 +1693,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     super.dispose();
   }
 
-  _CodeFieldRender? get _render => _editorKey?.currentContext?.findRenderObject() as _CodeFieldRender?;
+  _CodeFieldRender? get _render =>
+      _editorKey?.currentContext?.findRenderObject() as _CodeFieldRender?;
 
   bool _isAlphanumeric(int codeUnit) {
     return (codeUnit <= 57 && codeUnit >= 48) ||
@@ -1617,7 +1717,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       selection: selection.copyWith(
         baseIndex: selection.baseIndex - 1,
         extentIndex: selection.extentIndex - 1,
-      )
+      ),
     );
     makeCursorCenterIfInvisible();
   }
@@ -1637,7 +1737,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       selection: selection.copyWith(
         baseIndex: selection.baseIndex + 1,
         extentIndex: selection.extentIndex + 1,
-      )
+      ),
     );
     makeCursorCenterIfInvisible();
   }
@@ -1652,10 +1752,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     if (e + 1 < codeLines.length) {
       newCodeLines.addFrom(codeLines, e + 1);
     }
-    value = value.copyWith(
-      codeLines: newCodeLines,
-      selection: selection,
-    );
+    value = value.copyWith(codeLines: newCodeLines, selection: selection);
     makeCursorCenterIfInvisible();
   }
 
@@ -1691,11 +1788,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     }
     final CodeLines newCodeLines = CodeLines.from(codeLines);
     newCodeLines[selection.extentIndex] = extentLine.copyWith(
-      text: _codeTextBefore(selection.extent)
+      text: _codeTextBefore(selection.extent),
     );
-    value = value.copyWith(
-      codeLines: newCodeLines,
-    );
+    value = value.copyWith(codeLines: newCodeLines);
     makeCursorVisible();
   }
 
@@ -1710,7 +1805,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     }
     final CodeLines newCodeLines = CodeLines.from(codeLines);
     newCodeLines[selection.extentIndex] = extentLine.copyWith(
-      text: _codeTextAfter(selection.extent)
+      text: _codeTextAfter(selection.extent),
     );
     value = value.copyWith(
       codeLines: newCodeLines,
@@ -1736,16 +1831,13 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     final int index = min(selection.startIndex, newCodeLines.length - 1);
     final int offset;
     if (keepExtentOffset) {
-       offset = min(newCodeLines[index].length, selection.extentOffset);
+      offset = min(newCodeLines[index].length, selection.extentOffset);
     } else {
       offset = 0;
     }
     value = value.copyWith(
       codeLines: newCodeLines,
-      selection: CodeLineSelection.collapsed(
-        index: index,
-        offset: offset
-      ),
+      selection: CodeLineSelection.collapsed(index: index, offset: offset),
     );
     makeCursorCenterIfInvisible();
   }
@@ -1756,9 +1848,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     }
     final CodeLines newCodeLines = codeLines.sublines(0, selection.startIndex);
     final CodeLine after = _codeLineAfter(selection.end);
-    newCodeLines.add(after.copyWith(
-      text: _codeTextBefore(selection.start) + after.text,
-    ));
+    newCodeLines.add(
+      after.copyWith(text: _codeTextBefore(selection.start) + after.text),
+    );
     if (selection.endIndex + 1 < codeLines.length) {
       newCodeLines.addFrom(codeLines, selection.endIndex + 1);
     }
@@ -1767,8 +1859,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       selection: CodeLineSelection.collapsed(
         index: selection.startIndex,
         offset: selection.startOffset,
-        affinity: selection.start.affinity
-      )
+        affinity: selection.start.affinity,
+      ),
     );
     makeCursorCenterIfInvisible();
   }
@@ -1781,15 +1873,20 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       }
       if (selection.baseOffset == 0) {
         // Delete this line and merge into the previous line
-        final CodeLines newCodeLines = codeLines.sublines(0, selection.baseIndex - 1);
+        final CodeLines newCodeLines = codeLines.sublines(
+          0,
+          selection.baseIndex - 1,
+        );
         final CodeLine preLine = codeLines[selection.baseIndex - 1];
         if (preLine.chunkParent) {
           // Should expand this chunk
           newCodeLines.add(CodeLine(preLine.text));
-          newCodeLines.addAll(preLine.chunks.sublist(0, preLine.chunks.length - 1));
-          newCodeLines.add(baseLine.copyWith(
-            text: preLine.chunks.last.text + baseLine.text
-          ));
+          newCodeLines.addAll(
+            preLine.chunks.sublist(0, preLine.chunks.length - 1),
+          );
+          newCodeLines.add(
+            baseLine.copyWith(text: preLine.chunks.last.text + baseLine.text),
+          );
           if (selection.baseIndex + 1 < codeLines.length) {
             newCodeLines.addFrom(codeLines, selection.baseIndex + 1);
           }
@@ -1798,12 +1895,12 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
             selection: CodeLineSelection.collapsed(
               index: selection.baseIndex + preLine.chunks.length - 1,
               offset: preLine.chunks.last.length,
-            )
+            ),
           );
         } else {
-          newCodeLines.add(baseLine.copyWith(
-            text: preLine.text + baseLine.text
-          ));
+          newCodeLines.add(
+            baseLine.copyWith(text: preLine.text + baseLine.text),
+          );
           if (selection.baseIndex + 1 < codeLines.length) {
             newCodeLines.addFrom(codeLines, selection.baseIndex + 1);
           }
@@ -1812,7 +1909,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
             selection: CodeLineSelection.collapsed(
               index: selection.baseIndex - 1,
               offset: preLine.length,
-            )
+            ),
           );
         }
       } else {
@@ -1821,14 +1918,16 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
           // Delete left and right closure symbols at same time, like this:
           // abc{|}123 -> abc123
           newCodeLines[selection.baseIndex] = baseLine.copyWith(
-            text: baseLine.substring(0, selection.baseOffset - 1) + baseLine.substring(selection.baseOffset + 1)
+            text:
+                baseLine.substring(0, selection.baseOffset - 1) +
+                baseLine.substring(selection.baseOffset + 1),
           );
           value = value.copyWith(
             codeLines: newCodeLines,
             selection: CodeLineSelection.collapsed(
               index: selection.baseIndex,
-              offset: selection.baseOffset - 1
-            )
+              offset: selection.baseOffset - 1,
+            ),
           );
         } else {
           String backward = _codeTextBefore(selection.base);
@@ -1841,14 +1940,14 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
             backward = characters.skipLast(1).string;
           }
           newCodeLines[selection.baseIndex] = baseLine.copyWith(
-            text: backward + baseLine.substring(selection.baseOffset)
+            text: backward + baseLine.substring(selection.baseOffset),
           );
           value = value.copyWith(
             codeLines: newCodeLines,
             selection: CodeLineSelection.collapsed(
               index: selection.baseIndex,
-              offset: backward.length
-            )
+              offset: backward.length,
+            ),
           );
         }
       }
@@ -1860,27 +1959,33 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   void _deleteForward() {
     if (selection.isCollapsed) {
-      if (selection.extentIndex == codeLines.length - 1 && selection.extentOffset == codeLines.last.length) {
+      if (selection.extentIndex == codeLines.length - 1 &&
+          selection.extentOffset == codeLines.last.length) {
         // At the end position of page, nothing to delete
         return;
       }
       if (selection.extentOffset == extentLine.length) {
         // Delete next line and merge into the current line
-        final CodeLines newCodeLines = codeLines.sublines(0, selection.extentIndex);
+        final CodeLines newCodeLines = codeLines.sublines(
+          0,
+          selection.extentIndex,
+        );
         if (extentLine.chunkParent) {
           final CodeLine nextLine = extentLine.chunks.first;
           // Should expand this chunk
-          newCodeLines.add(nextLine.copyWith(
-            text: extentLine.text + nextLine.text
-          ));
+          newCodeLines.add(
+            nextLine.copyWith(text: extentLine.text + nextLine.text),
+          );
           newCodeLines.addAll(extentLine.chunks.sublist(1));
           if (selection.extentIndex + 1 < codeLines.length) {
             newCodeLines.addFrom(codeLines, selection.extentIndex + 1);
           }
         } else {
-          newCodeLines.add(codeLines[selection.extentIndex + 1].copyWith(
-            text: extentLine.text + codeLines[selection.extentIndex + 1].text
-          ));
+          newCodeLines.add(
+            codeLines[selection.extentIndex + 1].copyWith(
+              text: extentLine.text + codeLines[selection.extentIndex + 1].text,
+            ),
+          );
           if (selection.extentIndex + 2 < codeLines.length) {
             newCodeLines.addFrom(codeLines, selection.extentIndex + 2);
           }
@@ -1890,7 +1995,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
           selection: CodeLineSelection.collapsed(
             index: selection.extentIndex,
             offset: extentLine.length,
-          )
+          ),
         );
       } else {
         final CodeLines newCodeLines = CodeLines.from(codeLines);
@@ -1898,19 +2003,22 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
           // Delete left and right closure symbols at same time, like this:
           // abc{|} -> abc
           newCodeLines[selection.extentIndex] = extentLine.copyWith(
-            text: extentLine.substring(0, selection.extentOffset - 1) + extentLine.substring(selection.extentOffset + 1)
+            text:
+                extentLine.substring(0, selection.extentOffset - 1) +
+                extentLine.substring(selection.extentOffset + 1),
           );
           value = value.copyWith(
             codeLines: newCodeLines,
             selection: CodeLineSelection.collapsed(
               index: selection.extentIndex,
-              offset: selection.extentOffset - 1
-            )
+              offset: selection.extentOffset - 1,
+            ),
           );
         } else {
           String forward = _codeTextAfter(selection.extent);
           final int indentSizeInForward = _prefixWhitespaceCount(forward);
-          if (indentSizeInForward > 0 && indentSizeInForward % indent.length == 0) {
+          if (indentSizeInForward > 0 &&
+              indentSizeInForward % indent.length == 0) {
             forward = forward.substring(indent.length);
           } else {
             // Delete the next character normally
@@ -1918,14 +2026,14 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
             forward = characters.skip(1).string;
           }
           newCodeLines[selection.extentIndex] = extentLine.copyWith(
-            text: _codeTextBefore(selection.extent) + forward
+            text: _codeTextBefore(selection.extent) + forward,
           );
           value = value.copyWith(
             codeLines: newCodeLines,
             selection: CodeLineSelection.collapsed(
               index: selection.extentIndex,
-              offset: selection.extentOffset
-            )
+              offset: selection.extentOffset,
+            ),
           );
         }
       }
@@ -1971,9 +2079,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     }
     final CodeLines newCodeLines = CodeLines.from(codeLines);
     newCodeLines[selection.extentIndex] = extentLine.copyWith(
-      text: _codeTextBefore(selection.extent.copyWith(
-        offset: i
-      )) + _codeTextAfter(selection.extent)
+      text:
+          _codeTextBefore(selection.extent.copyWith(offset: i)) +
+          _codeTextAfter(selection.extent),
     );
     value = value.copyWith(
       codeLines: newCodeLines,
@@ -2019,13 +2127,11 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     }
     final CodeLines newCodeLines = CodeLines.from(codeLines);
     newCodeLines[selection.extentIndex] = extentLine.copyWith(
-      text: _codeTextBefore(selection.extent) + _codeTextAfter(selection.extent.copyWith(
-        offset: i
-      ))
+      text:
+          _codeTextBefore(selection.extent) +
+          _codeTextAfter(selection.extent.copyWith(offset: i)),
     );
-    value = value.copyWith(
-      codeLines: newCodeLines,
-    );
+    value = value.copyWith(codeLines: newCodeLines);
     makeCursorVisible();
   }
 
@@ -2049,9 +2155,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       offset = alignIndent.length;
     }
     // Align the next line's intent with pre code line
-    newCodeLines.add(after.copyWith(
-      text: alignIndent + after.text
-    ));
+    newCodeLines.add(after.copyWith(text: alignIndent + after.text));
     if (selection.endIndex + 1 < codeLines.length) {
       newCodeLines.addFrom(codeLines, selection.endIndex + 1);
     }
@@ -2059,7 +2163,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       codeLines: newCodeLines,
       selection: CodeLineSelection.collapsed(
         index: selection.startIndex + 1,
-        offset: offset
+        offset: offset,
       ),
     );
     makeCursorCenterIfInvisible();
@@ -2068,30 +2172,37 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   void _applyIndent() {
     final CodeLines newCodeLines = CodeLines.from(codeLines);
     if (selection.isSameLine) {
-      if (selection.isCollapsed || selection.startOffset != 0 || selection.endOffset != endLine.length) {
+      if (selection.isCollapsed ||
+          selection.startOffset != 0 ||
+          selection.endOffset != endLine.length) {
         final String textBefore = _codeTextBefore(selection.start);
-        final int indentLength = indent.length - textBefore.length % indent.length;
+        final int indentLength =
+            indent.length - textBefore.length % indent.length;
         newCodeLines[selection.extentIndex] = extentLine.copyWith(
-          text: textBefore + ' ' * indentLength + _codeTextAfter(selection.end)
+          text: textBefore + ' ' * indentLength + _codeTextAfter(selection.end),
         );
         value = value.copyWith(
           codeLines: newCodeLines,
           selection: CodeLineSelection.collapsed(
             index: selection.startIndex,
-            offset: selection.startOffset + indentLength
-          )
+            offset: selection.startOffset + indentLength,
+          ),
         );
       } else {
         // This whole line is selected, just add the indent
         newCodeLines[selection.extentIndex] = extentLine.copyWith(
-          text: _applyTextIndent(extentLine.text)
+          text: _applyTextIndent(extentLine.text),
         );
         value = value.copyWith(
           codeLines: newCodeLines,
           selection: selection.copyWith(
-            baseOffset: selection.baseOffset == 0 ? 0 : newCodeLines[selection.baseIndex].length,
-            extentOffset: selection.extentOffset == 0 ? 0 : newCodeLines[selection.extentIndex].length
-          )
+            baseOffset: selection.baseOffset == 0
+                ? 0
+                : newCodeLines[selection.baseIndex].length,
+            extentOffset: selection.extentOffset == 0
+                ? 0
+                : newCodeLines[selection.extentIndex].length,
+          ),
         );
       }
     } else {
@@ -2107,17 +2218,27 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
         }
         newCodeLines[i] = codeLines[i].copyWith(
           text: _applyTextIndent(codeLines[i].text),
-          chunks: chunks
+          chunks: chunks,
         );
       }
       value = value.copyWith(
         codeLines: newCodeLines,
         selection: selection.copyWith(
-          baseOffset: _whitespaceCountBefore(baseLine.text, selection.baseOffset) == selection.baseOffset ?
-            selection.baseOffset : selection.baseOffset + (newCodeLines[selection.baseIndex].length - baseLine.text.length),
-          extentOffset: _whitespaceCountBefore(extentLine.text, selection.extentOffset) == selection.extentOffset ?
-            selection.extentOffset : selection.extentOffset + (newCodeLines[selection.extentIndex].length - extentLine.text.length),
-        )
+          baseOffset:
+              _whitespaceCountBefore(baseLine.text, selection.baseOffset) ==
+                  selection.baseOffset
+              ? selection.baseOffset
+              : selection.baseOffset +
+                    (newCodeLines[selection.baseIndex].length -
+                        baseLine.text.length),
+          extentOffset:
+              _whitespaceCountBefore(extentLine.text, selection.extentOffset) ==
+                  selection.extentOffset
+              ? selection.extentOffset
+              : selection.extentOffset +
+                    (newCodeLines[selection.extentIndex].length -
+                        extentLine.text.length),
+        ),
       );
     }
     makeCursorCenterIfInvisible();
@@ -2127,7 +2248,7 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     final CodeLines newCodeLines;
     if (selection.isSameLine) {
       final CodeLine outdentCodeLine = extentLine.copyWith(
-      text: _applyTextOutdent(extentLine.text)
+        text: _applyTextOutdent(extentLine.text),
       );
       if (outdentCodeLine == extentLine) {
         // Nothing changed
@@ -2149,12 +2270,19 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
           // Apply indent to collapsed chunks
           chunks = _applyOutdents(chunks);
         }
-        outdentCodeLines.add(codeLines[i].copyWith(
-          text: _applyTextOutdent(codeLines[i].text),
-          chunks: chunks
-        ));
+        outdentCodeLines.add(
+          codeLines[i].copyWith(
+            text: _applyTextOutdent(codeLines[i].text),
+            chunks: chunks,
+          ),
+        );
       }
-      if (outdentCodeLines.equals(codeLines.sublines(selection.startIndex, lastSkipped ? selection.endIndex : selection.endIndex + 1))) {
+      if (outdentCodeLines.equals(
+        codeLines.sublines(
+          selection.startIndex,
+          lastSkipped ? selection.endIndex : selection.endIndex + 1,
+        ),
+      )) {
         // Nothing changed
         return;
       }
@@ -2164,16 +2292,40 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       }
     }
     // If there are enough whitespace after the selection, we should keep the selection offset.
-    final int whitespaceCountAfterBaseLine = max(0, _prefixWhitespaceCount(baseLine.text) - selection.baseOffset);
-    final int baseOffset = max(0, selection.baseOffset - max(0, baseLine.length - newCodeLines[selection.baseIndex].length - whitespaceCountAfterBaseLine));
-    final int whitespaceCountAfterExtentLine = max(0, _prefixWhitespaceCount(extentLine.text) - selection.extentOffset);
-    final int extentOffset = max(0, selection.extentOffset - max(0, extentLine.length - newCodeLines[selection.extentIndex].length - whitespaceCountAfterExtentLine));
+    final int whitespaceCountAfterBaseLine = max(
+      0,
+      _prefixWhitespaceCount(baseLine.text) - selection.baseOffset,
+    );
+    final int baseOffset = max(
+      0,
+      selection.baseOffset -
+          max(
+            0,
+            baseLine.length -
+                newCodeLines[selection.baseIndex].length -
+                whitespaceCountAfterBaseLine,
+          ),
+    );
+    final int whitespaceCountAfterExtentLine = max(
+      0,
+      _prefixWhitespaceCount(extentLine.text) - selection.extentOffset,
+    );
+    final int extentOffset = max(
+      0,
+      selection.extentOffset -
+          max(
+            0,
+            extentLine.length -
+                newCodeLines[selection.extentIndex].length -
+                whitespaceCountAfterExtentLine,
+          ),
+    );
     value = value.copyWith(
       codeLines: newCodeLines,
       selection: selection.copyWith(
         baseOffset: baseOffset,
         extentOffset: extentOffset,
-      )
+      ),
     );
     makeCursorCenterIfInvisible();
   }
@@ -2196,19 +2348,17 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
         newCodeLines = CodeLines.from(codeLines);
         final String take = preLine.takeLastCharacter(1);
         newCodeLines[selection.baseIndex - 1] = preLine.copyWith(
-          text: preLine.skipLastCharacter(1)
+          text: preLine.skipLastCharacter(1),
         );
-        newCodeLines[selection.baseIndex] = baseLine.copyWith(
-          text: take
-        );
+        newCodeLines[selection.baseIndex] = baseLine.copyWith(text: take);
         newOffset = take.length;
       } else {
         newCodeLines = CodeLines.from(codeLines);
         newCodeLines[selection.baseIndex - 1] = preLine.copyWith(
-          text: preLine.text + baseLine.takeCharacter(1)
+          text: preLine.text + baseLine.takeCharacter(1),
         );
         newCodeLines[selection.baseIndex] = baseLine.copyWith(
-          text: baseLine.skipCharacter(1)
+          text: baseLine.skipCharacter(1),
         );
         newOffset = 0;
       }
@@ -2217,54 +2367,54 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
         selection: selection.copyWith(
           baseOffset: newOffset,
           extentOffset: newOffset,
-        )
+        ),
       );
-    } else if (selection.baseOffset == baseLine.length && baseLine.characterLength == 1) {
+    } else if (selection.baseOffset == baseLine.length &&
+        baseLine.characterLength == 1) {
       if (selection.baseIndex == 0) {
         return;
       }
       final CodeLine preLine = codeLines[selection.baseIndex - 1];
       final CodeLines newCodeLines = CodeLines.from(codeLines);
       newCodeLines[selection.baseIndex - 1] = preLine.copyWith(
-        text: preLine.text + baseLine.text
+        text: preLine.text + baseLine.text,
       );
-      newCodeLines[selection.baseIndex] = baseLine.copyWith(
-        text: ''
-      );
+      newCodeLines[selection.baseIndex] = baseLine.copyWith(text: '');
       value = value.copyWith(
         codeLines: newCodeLines,
-        selection: selection.copyWith(
-          baseOffset: 0,
-          extentOffset: 0,
-        )
+        selection: selection.copyWith(baseOffset: 0, extentOffset: 0),
       );
     } else if (selection.baseOffset == baseLine.length) {
       final CodeLines newCodeLines = CodeLines.from(codeLines);
       newCodeLines[selection.baseIndex] = baseLine.copyWith(
-        text: baseLine.skipLastCharacter(2) +
-          baseLine.takeCharacterAtLastIndex(0) +
-          baseLine.takeCharacterAtLastIndex(1)
+        text:
+            baseLine.skipLastCharacter(2) +
+            baseLine.takeCharacterAtLastIndex(0) +
+            baseLine.takeCharacterAtLastIndex(1),
       );
-      value = value.copyWith(
-        codeLines: newCodeLines,
-      );
+      value = value.copyWith(codeLines: newCodeLines);
     } else {
       final CodeLines newCodeLines = CodeLines.from(codeLines);
       final Characters characters = baseLine.text.characters;
-      final int index = baseLine.text.substring(0, selection.baseOffset).characters.length;
+      final int index = baseLine.text
+          .substring(0, selection.baseOffset)
+          .characters
+          .length;
       final String start = characters.take(index - 1).string;
       final String right = characters.elementAt(index);
       final String left = characters.elementAt(index - 1);
-      final String end = characters.takeLast(characters.length - index - 1).string;
+      final String end = characters
+          .takeLast(characters.length - index - 1)
+          .string;
       newCodeLines[selection.baseIndex] = baseLine.copyWith(
-        text: start + right + left + end
+        text: start + right + left + end,
       );
       value = value.copyWith(
         codeLines: newCodeLines,
         selection: selection.copyWith(
           baseOffset: selection.baseOffset + right.length,
           extentOffset: selection.extentOffset + right.length,
-        )
+        ),
       );
     }
   }
@@ -2279,20 +2429,29 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     int index = 0;
     int offset = 0;
     if (replaceCodeLines.length == 1) {
-      newCodeLines.add(codeLines[range.endIndex].copyWith(
-        text: _codeTextBefore(range.start) + replaceCodeLines.first + _codeTextAfter(range.end)
-      ));
+      newCodeLines.add(
+        codeLines[range.endIndex].copyWith(
+          text:
+              _codeTextBefore(range.start) +
+              replaceCodeLines.first +
+              _codeTextAfter(range.end),
+        ),
+      );
       index = range.startIndex;
       offset = range.startOffset + replaceCodeLines.first.length;
     } else {
       for (int i = 0; i < replaceCodeLines.length; i++) {
         final String replaceCodeLine = replaceCodeLines[i];
         if (i == 0) {
-          newCodeLines.add(CodeLine(_codeTextBefore(range.start) + replaceCodeLine));
+          newCodeLines.add(
+            CodeLine(_codeTextBefore(range.start) + replaceCodeLine),
+          );
         } else if (i == replaceCodeLines.length - 1) {
-          newCodeLines.add(codeLines[range.endIndex].copyWith(
-            text: replaceCodeLine + _codeTextAfter(range.end)
-          ));
+          newCodeLines.add(
+            codeLines[range.endIndex].copyWith(
+              text: replaceCodeLine + _codeTextAfter(range.end),
+            ),
+          );
           index = newCodeLines.length - 1;
           offset = replaceCodeLine.length;
         } else {
@@ -2308,8 +2467,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       selection: CodeLineSelection.collapsed(
         index: index,
         offset: offset,
-        affinity: range.extentAffinity
-      )
+        affinity: range.extentAffinity,
+      ),
     );
     makeCursorCenterIfInvisible();
   }
@@ -2340,7 +2499,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     extentOffset += delta;
     final int length = newCodeLines.length;
     for (int i = 0; i < length; i++) {
-      final int end = start + newCodeLines[i].charCount + lineBreak.value.length;
+      final int end =
+          start + newCodeLines[i].charCount + lineBreak.value.length;
       if (extentOffset >= start && extentOffset < end) {
         newExtentIndex = i;
         newExtentOffset = extentOffset - start;
@@ -2352,8 +2512,8 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       codeLines: newCodeLines,
       selection: CodeLineSelection.collapsed(
         index: newExtentIndex,
-        offset: newExtentOffset
-      )
+        offset: newExtentOffset,
+      ),
     );
     makeCursorCenterIfInvisible();
   }
@@ -2364,7 +2524,12 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     }
     final List<CodeLine> newChildren = [];
     for (final CodeLine codeLine in children) {
-      newChildren.add(CodeLine(_applyTextIndent(codeLine.text), _applyIndents(codeLine.chunks)));
+      newChildren.add(
+        CodeLine(
+          _applyTextIndent(codeLine.text),
+          _applyIndents(codeLine.chunks),
+        ),
+      );
     }
     return newChildren;
   }
@@ -2375,7 +2540,12 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     }
     final List<CodeLine> newChildren = [];
     for (final CodeLine codeLine in children) {
-      newChildren.add(CodeLine(_applyTextOutdent(codeLine.text), _applyOutdents(codeLine.chunks)));
+      newChildren.add(
+        CodeLine(
+          _applyTextOutdent(codeLine.text),
+          _applyOutdents(codeLine.chunks),
+        ),
+      );
     }
     return newChildren;
   }
@@ -2443,8 +2613,10 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     return _kClosureAndQuates.contains(text.substring(offset - 1, offset + 1));
   }
 
-  bool _isMultipleIndent(String text) => text.isNotEmpty && text.length % indent.length == 0
-    && _prefixWhitespaceCount(text) == text.length;
+  bool _isMultipleIndent(String text) =>
+      text.isNotEmpty &&
+      text.length % indent.length == 0 &&
+      _prefixWhitespaceCount(text) == text.length;
 
   bool get _selectionInClosure {
     int? forwardUnitCode;
@@ -2471,7 +2643,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     if (backwardUnitCode == null) {
       return false;
     }
-    return _kClosures.contains(String.fromCharCodes([forwardUnitCode, backwardUnitCode]));
+    return _kClosures.contains(
+      String.fromCharCodes([forwardUnitCode, backwardUnitCode]),
+    );
   }
 
   @override
@@ -2482,18 +2656,17 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     required TextStyle style,
   }) {
     return spanBuilder?.call(
-      context: context,
-      index: index,
-      codeLine: codeLines[index],
-      textSpan: textSpan,
-      style: style
-    ) ?? textSpan;
+          context: context,
+          index: index,
+          codeLine: codeLines[index],
+          textSpan: textSpan,
+          style: style,
+        ) ??
+        textSpan;
   }
-
 }
 
 class _CodeLineEditingCache {
-
   final CodeLineEditingController controller;
   late _CodeLineEditingCacheNode _node;
   late bool _markNewRecord;
@@ -2556,7 +2729,9 @@ class _CodeLineEditingCache {
   }
 
   void _appendNewNode() {
-    final _CodeLineEditingCacheNode newNode = _CodeLineEditingCacheNode(controller.value);
+    final _CodeLineEditingCacheNode newNode = _CodeLineEditingCacheNode(
+      controller.value,
+    );
     if (_node.next != null) {
       _node.next!.pre = null;
     }
@@ -2564,11 +2739,9 @@ class _CodeLineEditingCache {
     newNode.pre = _node;
     _node = newNode;
   }
-
 }
 
 class _CodeLineEditingCacheNode {
-
   _CodeLineEditingCacheNode? pre;
   _CodeLineEditingCacheNode? next;
   CodeLineEditingValue value;
@@ -2580,11 +2753,9 @@ class _CodeLineEditingCacheNode {
   bool get isInitial => pre == null && next == null;
 
   bool get isTail => next == null;
-
 }
 
 extension _StringExtension on String {
-
   int get indentLength {
     int index = 0;
     for (; index < length; index++) {
@@ -2606,11 +2777,9 @@ extension _StringExtension on String {
   String insert(String value, int index) {
     return substring(0, index) + value + substring(index);
   }
-
 }
 
 class _CodeLineEditingControllerDelegate implements CodeLineEditingController {
-
   late CodeLineEditingController _delegate;
   final List<ui.VoidCallback> _listeners = [];
 
@@ -2732,7 +2901,7 @@ class _CodeLineEditingControllerDelegate implements CodeLineEditingController {
       context: context,
       index: index,
       textSpan: textSpan,
-      style: style
+      style: style,
     );
   }
 
@@ -2913,6 +3082,11 @@ class _CodeLineEditingControllerDelegate implements CodeLineEditingController {
   }
 
   @override
+  CodeLinePosition? hitTestText(Offset globalPosition) {
+    return _delegate.hitTestText(globalPosition);
+  }
+
+  @override
   void moveCursor(AxisDirection direction) {
     _delegate.moveCursor(direction);
   }
@@ -3062,5 +3236,4 @@ class _CodeLineEditingControllerDelegate implements CodeLineEditingController {
   void undo() {
     _delegate.undo();
   }
-
 }
