@@ -190,6 +190,7 @@ class CodeEditor extends StatefulWidget {
     this.scrollController,
     this.findController,
     this.toolbarController,
+    this.decorations,
     this.onChanged,
     this.style,
     this.hint,
@@ -228,6 +229,13 @@ class CodeEditor extends StatefulWidget {
 
   /// Controls the selection toolbar.
   final SelectionToolbarController? toolbarController;
+
+  /// Holds the decorations painted over the code, such as the wavy underlines
+  /// of diagnostics.
+  ///
+  /// Mutating the controller repaints the decoration layer only, it neither
+  /// relayouts nor re-highlights the code.
+  final CodeDecorationController? decorations;
 
   /// Called when the user initiates a change to the editor's
   /// value was changed, such as insertion or deletion.
@@ -525,6 +533,7 @@ class _CodeEditorState extends State<CodeEditor> {
       cursorLineColor: widget.style?.cursorLineColor,
       bracketMatchColor: widget.style?.bracketMatchColor,
       chunkIndicatorColor: widget.style?.chunkIndicatorColor,
+      decorations: widget.decorations,
       cursorWidth: widget.style?.cursorWidth ?? _kDefaultCaretWidth,
       showCursorWhenReadOnly: widget.showCursorWhenReadOnly ?? true,
       sperator: widget.sperator,

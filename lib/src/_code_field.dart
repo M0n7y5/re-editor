@@ -24,6 +24,7 @@ class _CodeField extends SingleChildRenderObjectWidget {
   final Color? cursorLineColor;
   final Color? bracketMatchColor;
   final Color? chunkIndicatorColor;
+  final CodeDecorationController? decorations;
   final double cursorWidth;
   final double floatingCursorWidth;
   final EdgeInsetsGeometry padding;
@@ -56,6 +57,7 @@ class _CodeField extends SingleChildRenderObjectWidget {
     this.cursorLineColor,
     this.bracketMatchColor,
     this.chunkIndicatorColor,
+    this.decorations,
     required this.cursorWidth,
     floatingCursorWidth,
     required this.padding,
@@ -92,6 +94,7 @@ class _CodeField extends SingleChildRenderObjectWidget {
     cursorLineColor: cursorLineColor,
     bracketMatchColor: bracketMatchColor,
     chunkIndicatorColor: chunkIndicatorColor,
+    decorations: decorations,
     cursorWidth: cursorWidth,
     floatingCursorWidth: floatingCursorWidth,
     padding: padding,
@@ -126,6 +129,7 @@ class _CodeField extends SingleChildRenderObjectWidget {
       ..cursorLineColor = cursorLineColor
       ..bracketMatchColor = bracketMatchColor
       ..chunkIndicatorColor = chunkIndicatorColor
+      ..decorations = decorations
       ..cursorWidth = cursorWidth
       ..floatingCursorWidth = floatingCursorWidth
       ..padding = padding
@@ -194,6 +198,7 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
     Color? cursorLineColor,
     Color? bracketMatchColor,
     Color? chunkIndicatorColor,
+    CodeDecorationController? decorations,
     required double cursorWidth,
     required double floatingCursorWidth,
     required EdgeInsetsGeometry padding,
@@ -230,12 +235,16 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
         _CodeCursorLinePainter(cursorLineColor, _selection),
         _CodeFieldSelectionPainter(selectionColor, _selection),
         _CodeFieldHighlightPainter(highlightColor, highlightSelections ?? const []),
-        _CodeBracketMatchPainter(bracketMatchColor, matchedBrackets)
+        _CodeBracketMatchPainter(bracketMatchColor, matchedBrackets),
+        // The tint paints above the selection and below the text.
+        _CodeDecorationPainter(decorations, background: true)
       ]
     );
     adoptChild(_backgroundRender);
     _foregroundRender = _CodeFieldExtraRender(
       painters: [
+        // The underlines paint above the text and below the carets.
+        _CodeDecorationPainter(decorations, background: false),
         _CodeFieldCursorPainter(
           positions: _carets.map((CodeLineSelection s) => s.extent).toList(),
           color: cursorColor,
@@ -447,6 +456,11 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
     }
     _chunkIndicatorColor = value;
     markNeedsPaint();
+  }
+
+  set decorations(CodeDecorationController? value) {
+    _backgroundRender.find<_CodeDecorationPainter>().controller = value;
+    _foregroundRender.find<_CodeDecorationPainter>().controller = value;
   }
 
   set cursorWidth(double value) {
@@ -1414,6 +1428,14 @@ class _CodeFieldExtraRender extends RenderBox {
   }
 
   @override
+  void dispose() {
+    for (final _CodeFieldExtraPainter painter in painters) {
+      painter.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
   Size computeDryLayout(BoxConstraints constraints) => constraints.biggest;
 
   T find<T extends _CodeFieldExtraPainter>() {
@@ -1543,6 +1565,198 @@ class _CodeBracketMatchPainter extends _CodeFieldExtraPainter {
         _paint,
       );
     }
+  }
+
+}
+
+/// Paints the [CodeDecoration]s of a [CodeDecorationController].
+///
+/// One instance lives in the background layer (painting
+/// [CodeDecorationStyle.backgroundColor] below the text) and one in the
+/// foreground layer (painting the underlines above the text), both bound to
+/// the same controller.
+class _CodeDecorationPainter extends _CodeFieldExtraPainter {
+
+  /// Length of half a zigzag tooth, per logical pixel of underline thickness.
+  static const double _waveHalfPeriod = 2.0;
+
+  /// Peak offset of a zigzag tooth, per logical pixel of underline thickness.
+  static const double _waveAmplitude = 1.0;
+
+  /// How many characters a collapsed range is widened to before measuring.
+  static const int _collapsedRangeLength = 2;
+
+  /// Width painted for a range with nothing to measure (a collapsed range on
+  /// an empty line), as a fraction of the line height. At the default font
+  /// height this is about two monospaced characters.
+  static const double _unmeasurableRangeWidthRatio = 0.85;
+
+  final bool _background;
+  final Paint _paint;
+  final Path _path;
+  CodeDecorationController? _controller;
+
+  _CodeDecorationPainter(this._controller, {required bool background}) :
+    _background = background,
+    _paint = Paint(),
+    _path = Path() {
+    _paint.style = background ? PaintingStyle.fill : PaintingStyle.stroke;
+    _controller?.addListener(notifyListeners);
+  }
+
+  set controller(CodeDecorationController? value) {
+    if (_controller == value) {
+      return;
+    }
+    _controller?.removeListener(notifyListeners);
+    _controller = value;
+    _controller?.addListener(notifyListeners);
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _controller?.removeListener(notifyListeners);
+    _controller = null;
+    super.dispose();
+  }
+
+  @override
+  void paint(Canvas canvas, Size size, _CodeFieldRender render) {
+    final CodeDecorationController? controller = _controller;
+    if (controller == null) {
+      return;
+    }
+    final List<CodeLineRenderParagraph> paragraphs = render.displayParagraphs;
+    if (paragraphs.isEmpty) {
+      return;
+    }
+    // Display paragraphs are ordered by line index, so these bracket the
+    // visible part of the document, and the index of the controller turns them
+    // into exactly the decorations reaching into it: nothing outside the
+    // viewport is looked at, however many decorations there are.
+    final List<CodeDecoration> decorations = controller.decorationsOverlappingLines(
+      paragraphs.first.index,
+      paragraphs.last.index,
+    );
+    if (decorations.isEmpty) {
+      return;
+    }
+    final Offset paintOffset = render.paintOffset;
+    for (final CodeDecoration decoration in decorations) {
+      final CodeDecorationStyle style = decoration.style;
+      final Color? color = _background ? style.backgroundColor : style.underlineColor;
+      if (color == null || color.a == 0) {
+        continue;
+      }
+      if (!_background && style.underline == CodeDecorationUnderlineStyle.none) {
+        continue;
+      }
+      final CodeLinePosition start = decoration.range.start;
+      final CodeLinePosition end = decoration.range.end;
+      _paint.color = color;
+      // The covered paragraphs are a contiguous run of the visible ones, so
+      // the run is entered directly instead of walking every visible line.
+      for (int i = _firstParagraphFrom(paragraphs, start.index); i < paragraphs.length; i++) {
+        final CodeLineRenderParagraph paragraph = paragraphs[i];
+        if (paragraph.index > end.index) {
+          break;
+        }
+        final Offset delta = paragraph.offset - paintOffset;
+        for (final Rect rect in _rangeRects(
+          paragraph,
+          paragraph.index == start.index ? start.offset : 0,
+          paragraph.index == end.index ? end.offset : paragraph.length,
+        )) {
+          Rect region = rect.shift(delta);
+          if (region.bottom < 0 || region.top >= size.height) {
+            continue;
+          }
+          if (region.width <= 0) {
+            region = Rect.fromLTWH(region.left, region.top,
+              paragraph.preferredLineHeight * _unmeasurableRangeWidthRatio, region.height);
+          }
+          if (region.right < 0 || region.left >= size.width) {
+            continue;
+          }
+          if (_background) {
+            canvas.drawRect(region, _paint);
+          } else {
+            _drawUnderline(canvas, region, size, style);
+          }
+        }
+      }
+    }
+  }
+
+  /// The position in [paragraphs] of the first paragraph of line [index] or
+  /// below, `paragraphs.length` when every paragraph is above it.
+  static int _firstParagraphFrom(List<CodeLineRenderParagraph> paragraphs, int index) {
+    int low = 0;
+    int high = paragraphs.length;
+    while (low < high) {
+      final int middle = (low + high) >> 1;
+      if (paragraphs[middle].index < index) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    return low;
+  }
+
+  /// The rects covered by `[from, to)` of [paragraph], one per wrapped line.
+  ///
+  /// The range is clamped to the paragraph, so a decoration left over from an
+  /// older document revision is drawn where it fits instead of throwing. A
+  /// collapsed range is widened by up to [_collapsedRangeLength] characters,
+  /// which keeps zero length diagnostics visible.
+  List<Rect> _rangeRects(CodeLineRenderParagraph paragraph, int from, int to) {
+    final int length = paragraph.length;
+    int start = from.clamp(0, length);
+    int end = to.clamp(start, length);
+    if (start == end) {
+      end = min(length, start + _collapsedRangeLength);
+      if (start == end) {
+        start = max(0, end - _collapsedRangeLength);
+      }
+    }
+    if (start == end) {
+      // An empty line, there is no glyph to measure.
+      final Offset? offset = paragraph.getOffset(TextPosition(offset: start));
+      if (offset == null) {
+        return const [];
+      }
+      return [Rect.fromLTWH(offset.dx, offset.dy, 0, paragraph.preferredLineHeight)];
+    }
+    return paragraph.getRangeRects(TextRange(start: start, end: end));
+  }
+
+  void _drawUnderline(Canvas canvas, Rect region, Size size, CodeDecorationStyle style) {
+    final double thickness = style.underlineThickness;
+    final double amplitude = _waveAmplitude * thickness;
+    // Clipping to the viewport keeps the number of wave segments bounded by
+    // the width of the editor, whatever the length of the decorated range.
+    final double left = max(0, region.left);
+    final double right = min(size.width, region.right);
+    if (right <= left) {
+      return;
+    }
+    final double y = region.bottom - amplitude - thickness;
+    _paint.strokeWidth = thickness;
+    if (style.underline == CodeDecorationUnderlineStyle.solid) {
+      canvas.drawLine(Offset(left, y), Offset(right, y), _paint);
+      return;
+    }
+    final double halfPeriod = _waveHalfPeriod * thickness;
+    final Path path = _path..reset();
+    path.moveTo(left, y);
+    bool up = true;
+    for (double x = left; x < right; x += halfPeriod) {
+      path.lineTo(min(x + halfPeriod, right), up ? y - amplitude : y + amplitude);
+      up = !up;
+    }
+    canvas.drawPath(path, _paint);
   }
 
 }
