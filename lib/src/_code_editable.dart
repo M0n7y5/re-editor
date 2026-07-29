@@ -99,7 +99,8 @@ class _CodeEditable extends StatefulWidget {
 
 }
 
-class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveClientMixin<_CodeEditable>, SingleTickerProviderStateMixin {
+class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveClientMixin<_CodeEditable>, SingleTickerProviderStateMixin
+    implements _CodeAutocompleteHost {
 
   late bool _didAutoFocus;
   late final _CodeCursorBlinkController _cursorController;
@@ -108,6 +109,18 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
 
   late _CodeHighlighter _highlighter;
   late CodeIndicatorValueNotifier _codeIndicatorValueNotifier;
+
+  /// The autocomplete overlay above this editor, or null when there is none.
+  /// Resolved in [didChangeDependencies] rather than looked up per keystroke.
+  _CodeAutocompleteState? _autocompleteState;
+
+  /// The pending ask for autocomplete prompts.
+  ///
+  /// One coalescing, cancellable timer rather than a `Future.delayed` per
+  /// keystroke: a burst of N characters used to schedule N full re-shows, none of
+  /// which could be called off once the user moved on. Latest wins, and every
+  /// path that closes the overlay drops the pending ask with it.
+  Timer? _autocompleteDebounce;
 
   @override
   bool get wantKeepAlive => widget.focusNode.hasFocus;
@@ -167,6 +180,13 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final _CodeAutocompleteState? autocompleteState =
+      context.findAncestorStateOfType<_CodeAutocompleteState>();
+    if (!identical(autocompleteState, _autocompleteState)) {
+      _autocompleteState?._detachHost(this);
+      _autocompleteState = autocompleteState;
+      autocompleteState?._attachHost(this);
+    }
     if (!_didAutoFocus && widget.autofocus) {
       _didAutoFocus = true;
       SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -179,6 +199,10 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
 
   @override
   void dispose() {
+    _autocompleteDebounce?.cancel();
+    _autocompleteDebounce = null;
+    _autocompleteState?._detachHost(this);
+    _autocompleteState = null;
     widget.controller.removeListener(_onCodeInputChanged);
     widget.inputController.removeListener(_onCodeUserInputChanged);
     _highlighter.dispose();
@@ -360,10 +384,18 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
     if (!mounted) {
       return;
     }
-    // Delay 50ms to update the auto-complate prompt words.
-    Future.delayed(const Duration(milliseconds: 50), () {
-      _updateAutoCompleteState(true);
-    });
+    // Let the caret settle, then ask once. Coalescing and cancellable: a burst
+    // of keystrokes inside the window costs one ask instead of one per
+    // character, and every path that closes the overlay calls the pending one
+    // off (see [_updateAutoCompleteState]) so a stale ask cannot re-open it.
+    _autocompleteDebounce?.cancel();
+    _autocompleteDebounce = Timer(
+      _autocompleteState?.inputDebounce ?? const Duration(milliseconds: 50),
+      () {
+        _autocompleteDebounce = null;
+        _updateAutoCompleteState(true);
+      },
+    );
   }
 
   void _onCodeFindChanged() {
@@ -401,29 +433,47 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
     }
   }
 
-  void _updateAutoCompleteState(bool isCodeLineChanged) {
+  /// Asks for prompts at the caret right now — the manual trigger
+  /// ([CodeAutocompleteController.trigger]) reaching the one object that knows
+  /// where the caret is drawn.
+  @override
+  void requestAutocomplete({required CodeAutocompleteTriggerKind kind}) {
+    // The pending typing ask would otherwise fire a moment later and supersede
+    // the answer to this one.
+    _autocompleteDebounce?.cancel();
+    _autocompleteDebounce = null;
+    _updateAutoCompleteState(true, kind: kind);
+  }
+
+  void _updateAutoCompleteState(bool isCodeLineChanged, {
+    CodeAutocompleteTriggerKind kind = CodeAutocompleteTriggerKind.typing,
+  }) {
     if (!mounted) {
       return;
     }
-    final _CodeAutocompleteState? autocompleteState = context.findAncestorStateOfType<_CodeAutocompleteState>();
+    final _CodeAutocompleteState? autocompleteState = _autocompleteState;
     if (autocompleteState == null) {
       return;
     }
-    if (!isCodeLineChanged) {
-      autocompleteState.dismiss();
-      return;
-    }
-    if (widget.controller.isComposing || !widget.controller.selection.isCollapsed) {
+    // Every exit below closes the overlay, so the ask a keystroke already
+    // scheduled must go with it — otherwise the timer fires after the dismissal
+    // and re-opens what the user just closed.
+    if (!isCodeLineChanged ||
+        widget.controller.isComposing ||
+        !widget.controller.selection.isCollapsed) {
+      _autocompleteDebounce?.cancel();
+      _autocompleteDebounce = null;
       autocompleteState.dismiss();
       return;
     }
     final _CodeFieldRender? render = widget.editorKey.currentContext?.findRenderObject() as _CodeFieldRender?;
-    if (render == null) {
-      autocompleteState.dismiss();
-      return;
-    }
-    final Offset? position = render.calculateTextPositionScreenOffset(widget.controller.selection.extent, true);
-    if (position == null) {
+    final Offset? position = render?.calculateTextPositionScreenOffset(
+      widget.controller.selection.extent,
+      true,
+    );
+    if (render == null || position == null) {
+      _autocompleteDebounce?.cancel();
+      _autocompleteDebounce = null;
       autocompleteState.dismiss();
       return;
     }
@@ -432,8 +482,8 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
       position: position,
       lineHeight: render.lineHeight,
       value: widget.controller.value,
+      kind: kind,
       onAutocomplete: (value) {
-        autocompleteState.dismiss();
         final CodeLineSelection selection = widget.controller.selection;
         widget.controller.replaceSelection(value.word, selection.copyWith(
           baseOffset: selection.baseOffset - value.input.length,

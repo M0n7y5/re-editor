@@ -393,6 +393,17 @@ const Map<CodeShortcutType, List<ShortcutActivator>> _kDefaultMacCodeShortcutsAc
     SingleActivator(LogicalKeyboardKey.arrowDown, meta: true),
     SingleActivator(LogicalKeyboardKey.end, control: true)
   ],
+  // The intent and its handler have always been here; the binding was missing,
+  // so PageUp/PageDown did nothing at all. Bound now because an open
+  // autocomplete overlay claims these keys to page through its prompts, and a
+  // key that is claimed while a popup is up has to do something sensible when it
+  // is not.
+  CodeShortcutType.cursorMovePageUp: [
+    SingleActivator(LogicalKeyboardKey.pageUp)
+  ],
+  CodeShortcutType.cursorMovePageDown: [
+    SingleActivator(LogicalKeyboardKey.pageDown)
+  ],
   CodeShortcutType.cursorMoveWordBoundaryBackward: [
     SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true)
   ],
@@ -578,6 +589,12 @@ const Map<CodeShortcutType, List<ShortcutActivator>> _kDefaultCommonCodeShortcut
   CodeShortcutType.cursorMovePageEnd: [
     SingleActivator(LogicalKeyboardKey.arrowDown, control: true),
     SingleActivator(LogicalKeyboardKey.end, control: true)
+  ],
+  CodeShortcutType.cursorMovePageUp: [
+    SingleActivator(LogicalKeyboardKey.pageUp)
+  ],
+  CodeShortcutType.cursorMovePageDown: [
+    SingleActivator(LogicalKeyboardKey.pageDown)
   ],
   CodeShortcutType.cursorMoveWordBoundaryBackward: [
     SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true)

@@ -89,6 +89,12 @@ class _CodeShortcutActions extends StatelessWidget {
         actions[intent.runtimeType] = _EscCallbackAction(
           controller: editingController,
           findController: findController,
+          // An open autocomplete overlay is something ESC can close, and this
+          // getter is the only thing standing between the key and it: a disabled
+          // action is never invoked, so [_onAction] — where the overlay's own
+          // claim is consulted — would never run at all.
+          hasAutocompletePrompts: () =>
+            context.findAncestorStateOfType<_CodeAutocompleteState>()?.isShowing ?? false,
           onInvoke: (intent) {
             return _onAction(context, intent);
           },
@@ -342,15 +348,21 @@ class _EscCallbackAction<T extends Intent> extends CallbackAction<T> {
   final CodeLineEditingController controller;
   final CodeFindController? findController;
 
+  /// Whether an autocomplete overlay is on screen, which is one more thing ESC
+  /// has to do.
+  final ValueGetter<bool> hasAutocompletePrompts;
+
   _EscCallbackAction({
     required this.controller,
     required this.findController,
+    required this.hasAutocompletePrompts,
     required super.onInvoke,
   });
 
   @override
   bool isEnabled(T intent) {
     return !controller.isComposing &&
-        (findController?.value != null || !controller.selection.isCollapsed || controller.selections.length > 1);
+        (findController?.value != null || !controller.selection.isCollapsed ||
+         controller.selections.length > 1 || hasAutocompletePrompts());
   }
 }
