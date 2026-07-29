@@ -4805,5 +4805,174 @@ void main() {
       expect(controller.codeLines.length, 1);
       expect(controller.codeLines[0].text.length, 200000);
     });
+
+    test('outer runRevocableOp groups sequential replaceSelection into one undo', () {
+      final CodeLineEditingController controller =
+          CodeLineEditingController.fromText('hello');
+      final String original = controller.text;
+      // Prime selection outside the revocable block so the first value change
+      // under the flag is an edit (not a caret move).
+      controller.selection =
+          const CodeLineSelection.collapsed(index: 0, offset: 5);
+
+      controller.runRevocableOp(() {
+        controller.replaceSelection(' world');
+        controller.selection =
+            const CodeLineSelection.collapsed(index: 0, offset: 11);
+        controller.replaceSelection('!');
+      });
+
+      expect(controller.text, 'hello world!');
+      expect(controller.canUndo, isTrue);
+
+      // One undo restores both replacements — a single grouped node.
+      controller.undo();
+      expect(controller.text, original);
+    });
+
+    test('nested runRevocableOp still produces a single undo node', () {
+      final CodeLineEditingController controller =
+          CodeLineEditingController.fromText('abc');
+      final String original = controller.text;
+      controller.selection =
+          const CodeLineSelection.collapsed(index: 0, offset: 3);
+
+      controller.runRevocableOp(() {
+        controller.runRevocableOp(() {
+          controller.replaceSelection('1');
+        });
+        controller.runRevocableOp(() {
+          controller.replaceSelection('2');
+        });
+      });
+
+      expect(controller.text, 'abc12');
+      expect(controller.canUndo, isTrue);
+
+      controller.undo();
+      expect(controller.text, original);
+    });
+
+    test('unwrapped sequential replaceSelection still produces two undo nodes', () {
+      final CodeLineEditingController controller =
+          CodeLineEditingController.fromText('abc');
+
+      controller.selection =
+          const CodeLineSelection.collapsed(index: 0, offset: 3);
+      controller.replaceSelection('1');
+      expect(controller.text, 'abc1');
+
+      controller.selection =
+          const CodeLineSelection.collapsed(index: 0, offset: 4);
+      controller.replaceSelection('2');
+      expect(controller.text, 'abc12');
+
+      // First undo reverts only the second replacement.
+      controller.undo();
+      expect(controller.text, 'abc1');
+      expect(controller.canUndo, isTrue);
+
+      // Second undo reverts the first replacement.
+      controller.undo();
+      expect(controller.text, 'abc');
+    });
+
+    test('fresh controller: a batch on the initial cache node is one record', () {
+      // No selection priming: the cache cursor is still the initial node when
+      // the batch starts, so the first change takes the initial-append path.
+      final CodeLineEditingController controller =
+          CodeLineEditingController.fromText('hello');
+      final String original = controller.text;
+      expect(controller.canUndo, isFalse);
+
+      controller.runRevocableOp(() {
+        controller.replaceSelection('1');
+        controller.replaceSelection('2');
+      });
+
+      expect(controller.text, '12hello');
+      expect(controller.canUndo, isTrue);
+
+      // A single undo reverts the whole batch back to the initial value.
+      controller.undo();
+      expect(controller.text, original);
+      expect(controller.canUndo, isFalse);
+    });
+
+    test('fresh controller: a nested batch on the initial cache node is one record', () {
+      final CodeLineEditingController controller =
+          CodeLineEditingController.fromText('abc');
+      final String original = controller.text;
+
+      controller.runRevocableOp(() {
+        controller.runRevocableOp(() {
+          controller.replaceSelection('1');
+        });
+        controller.runRevocableOp(() {
+          controller.replaceSelection('2');
+        });
+      });
+
+      expect(controller.text, '12abc');
+      expect(controller.canUndo, isTrue);
+
+      controller.undo();
+      expect(controller.text, original);
+      expect(controller.canUndo, isFalse);
+    });
+
+    test('mid-history: a batch after undo is one record and truncates the redo tail', () {
+      final CodeLineEditingController controller =
+          CodeLineEditingController.fromText('abc');
+      controller.selection =
+          const CodeLineSelection.collapsed(index: 0, offset: 3);
+      controller.replaceSelection('1'); // 'abc1'
+      controller.replaceSelection('2'); // 'abc12'
+
+      controller.undo(); // back to 'abc1' — cursor is now mid-history
+      expect(controller.text, 'abc1');
+      expect(controller.canRedo, isTrue);
+
+      controller.runRevocableOp(() {
+        controller.replaceSelection('X');
+        controller.replaceSelection('Y');
+      });
+
+      expect(controller.text, 'abc1XY');
+      // The stale 'abc12' redo branch was dropped by the batch's first change.
+      expect(controller.canRedo, isFalse);
+
+      // One undo reverts the whole batch, not just the last change in it.
+      controller.undo();
+      expect(controller.text, 'abc1');
+      expect(controller.canRedo, isTrue);
+
+      // Redo walks back into the batch as a single step.
+      controller.redo();
+      expect(controller.text, 'abc1XY');
+
+      controller.undo();
+      controller.undo();
+      expect(controller.text, 'abc');
+    });
+
+    test('fresh controller: unbatched sequential edits still produce separate records', () {
+      // Guards the initial-append flag consumption: the *next* op must still
+      // open its own record instead of merging into the first one.
+      final CodeLineEditingController controller =
+          CodeLineEditingController.fromText('abc');
+
+      controller.replaceSelection('1'); // '1abc'
+      controller.replaceSelection('2'); // '12abc'
+      expect(controller.text, '12abc');
+
+      controller.undo();
+      expect(controller.text, '1abc');
+      expect(controller.canUndo, isTrue);
+
+      controller.undo();
+      expect(controller.text, 'abc');
+      expect(controller.canUndo, isFalse);
+    });
   });
 }

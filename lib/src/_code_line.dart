@@ -1475,6 +1475,10 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   /// [runRevocableOp] becomes a pass-through so the whole pass is one undo node.
   bool _multiCaretActive = false;
 
+  /// Nesting depth of [runRevocableOp]. Only the outermost enter/exit toggles
+  /// the undo-cache new-record flag, so nested public edits share one node.
+  int _revocableOpDepth = 0;
+
   /// Flat character offset of (line [index], [offset]) in the whole document,
   /// counting one line break per line. O(log N) via the buffer's prefix sums.
   int _flatOffsetOf(int index, int offset) {
@@ -1681,9 +1685,18 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       op();
       return;
     }
-    _cache.markNewRecord(true);
-    op();
-    _cache.markNewRecord(false);
+    if (_revocableOpDepth == 0) {
+      _cache.markNewRecord(true);
+    }
+    _revocableOpDepth++;
+    try {
+      op();
+    } finally {
+      _revocableOpDepth--;
+      if (_revocableOpDepth == 0) {
+        _cache.markNewRecord(false);
+      }
+    }
   }
 
   @override
@@ -2712,16 +2725,16 @@ class _CodeLineEditingCache {
     if (_node.value == controller.value) {
       return;
     }
-    if (_node.isInitial) {
-      _appendNewNode();
-      return;
-    }
-    if (!_node.isTail) {
-      _appendNewNode();
-      return;
-    }
-    if (_markNewRecord) {
-      _markNewRecord = false;
+    // A pending new-record request is satisfied by *whichever* append happens,
+    // so it must be consumed here rather than only on the tail-append path.
+    // Appending from the initial node (never-edited controller) or from
+    // mid-history (which truncates the redo tail) already opens the record the
+    // request asked for; leaving the flag set would make the next change inside
+    // the same [runRevocableOp] batch open a *second* record and split one
+    // logical edit into two undo steps.
+    final bool startNewRecord = _markNewRecord;
+    _markNewRecord = false;
+    if (startNewRecord || _node.isInitial || !_node.isTail) {
       _appendNewNode();
       return;
     }
