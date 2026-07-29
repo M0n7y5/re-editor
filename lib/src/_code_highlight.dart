@@ -22,17 +22,24 @@ class _CodeHighlighter extends ValueNotifier<_HighlightResults> {
   // flashing while the worker recomputes the viewport window.
   Map<String, _HighlightResult> _byText = const <String, _HighlightResult>{};
 
+  /// The application pushed semantic (LSP) colours merged over the grammar
+  /// layer, or null when the editor has no overlay channel.
+  CodeSemanticOverlayController? _semanticOverlay;
+
   _CodeHighlighter({
     required BuildContext context,
     required CodeLineEditingController controller,
     CodeHighlightTheme? theme,
+    CodeSemanticOverlayController? semanticOverlay,
   }) : _context = context,
     _provider = _CodeParagraphProvider(),
     _controller = controller,
     _theme = theme,
+    _semanticOverlay = semanticOverlay,
     _engine = _CodeHighlightEngine(theme),
     super(_HighlightResults.empty) {
     _controller.addListener(_onCodesChanged);
+    _semanticOverlay?.addListener(_onSemanticOverlayChanged);
     _docDirty = true;
     _dirty = true;
     _pump();
@@ -63,6 +70,20 @@ class _CodeHighlighter extends ValueNotifier<_HighlightResults> {
     _pump();
   }
 
+  /// Points the merge at another overlay channel (or none).
+  ///
+  /// Swapping the controller repaints with the new colours; like a change to
+  /// the controller's own value it never re-runs the grammar worker.
+  set semanticOverlay(CodeSemanticOverlayController? value) {
+    if (identical(_semanticOverlay, value)) {
+      return;
+    }
+    _semanticOverlay?.removeListener(_onSemanticOverlayChanged);
+    _semanticOverlay = value;
+    _semanticOverlay?.addListener(_onSemanticOverlayChanged);
+    _onSemanticOverlayChanged();
+  }
+
   IParagraph build({
     required int index,
     required TextStyle style,
@@ -86,28 +107,63 @@ class _CodeHighlighter extends ValueNotifier<_HighlightResults> {
   @override
   void dispose() {
     _controller.removeListener(_onCodesChanged);
+    _semanticOverlay?.removeListener(_onSemanticOverlayChanged);
     _engine.dispose();
     super.dispose();
   }
 
+  /// The overlay changed: every cached paragraph was built from the previous
+  /// colours, so they are dropped and the render object is told to lay out
+  /// again — which rebuilds the visible spans through [_buildSpan]. The
+  /// highlight worker is deliberately not woken: its answer, the grammar layer,
+  /// did not change.
+  void _onSemanticOverlayChanged() {
+    _provider.clearCache();
+    notifyListeners();
+  }
+
+  /// Builds one line's span: the grammar nodes, with the overlay merged over
+  /// them where this line carries any.
+  ///
+  /// The overlay is applied **here**, to the node list, and is never written
+  /// into either highlight cache. That is what keeps the text-keyed cache
+  /// below honest: it holds pure grammar results, so two byte-identical lines
+  /// may still share an entry — while their semantic colours, which are keyed
+  /// by absolute line index and can differ for the very same text (two
+  /// `build();` lines resolving to different symbols), are applied per line
+  /// after the lookup. Baking the merged colours into the caches instead would
+  /// alias those two lines onto whichever was seen first.
   TextSpan _buildSpan(int index, TextStyle style) {
     final String text = _controller.codeLines[index].text;
+    final List<CodeSemanticSpan>? overlay = _semanticOverlay?.spansForLine(index);
+    final List<_HighlightNode>? nodes = _grammarNodes(index, text);
+    if (overlay == null || overlay.isEmpty) {
+      return nodes == null
+        ? TextSpan(text: text, style: style)
+        : _buildSpanFromNodes(nodes, style);
+    }
+    return _buildSpanFromNodes(_mergeSemanticOverlay(
+      nodes ?? <_HighlightNode>[_HighlightNode(text)],
+      overlay
+    ), style);
+  }
+
+  /// The grammar nodes covering [text], or null when the line has none and
+  /// renders as plain text.
+  List<_HighlightNode>? _grammarNodes(int index, String text) {
     final _HighlightResult? result = value[index];
     if (result != null && result.nodes.isNotEmpty && result.source == text) {
-      return _buildSpanFromNodes(result.nodes, style);
+      return result.nodes;
     }
     // A line that only shifted index (newline inserted/removed above, paste,
     // line move) keeps its exact colours via the text-keyed cache, so it never
     // flashes plain/mis-coloured for the frame(s) before the worker recomputes.
     final _HighlightResult? cached = _byText[text];
     if (cached != null) {
-      return _buildSpanFromNodes(cached.nodes, style);
+      return cached.nodes;
     }
     if (result == null || result.nodes.isEmpty) {
-      return TextSpan(
-        text: text,
-        style: style
-      );
+      return null;
     }
     // Diff the changes and reuse node to avoid style blink.
     final List<_HighlightNode> startNodes = [];
@@ -142,12 +198,66 @@ class _CodeHighlighter extends ValueNotifier<_HighlightResults> {
     } else {
       midNode = null;
     }
-    return _buildSpanFromNodes([
+    return <_HighlightNode>[
       ...startNodes,
       if (midNode != null)
         midNode,
       ...endNodes
-    ], style);
+    ];
+  }
+
+  /// Splices [overlay] over [nodes], keeping the grammar style everywhere the
+  /// overlay does not reach.
+  ///
+  /// A grammar node partly covered by a span is split; a span reaching across
+  /// several nodes swallows all of them; a span running past the end of the
+  /// text is clipped by the nodes themselves, since they cover exactly the
+  /// line. [overlay] is disjoint and start-ordered (the controller guarantees
+  /// it), so both sides are walked once: O(nodes + spans).
+  static List<_HighlightNode> _mergeSemanticOverlay(
+      List<_HighlightNode> nodes, List<CodeSemanticSpan> overlay) {
+    final List<_HighlightNode> merged = <_HighlightNode>[];
+    int nodeStart = 0;
+    int next = 0;
+    for (final _HighlightNode node in nodes) {
+      final int nodeEnd = nodeStart + node.value.length;
+      int cursor = nodeStart;
+      // Spans wholly above this node were consumed by an earlier one.
+      while (next < overlay.length && overlay[next].end <= cursor) {
+        next++;
+      }
+      while (cursor < nodeEnd &&
+          next < overlay.length &&
+          overlay[next].start < nodeEnd) {
+        final CodeSemanticSpan span = overlay[next];
+        final int start = span.start < cursor ? cursor : span.start;
+        final int end = span.end > nodeEnd ? nodeEnd : span.end;
+        if (start > cursor) {
+          merged.add(_HighlightNode(
+            node.value.substring(cursor - nodeStart, start - nodeStart),
+            node.className,
+          ));
+        }
+        merged.add(_HighlightNode(
+          node.value.substring(start - nodeStart, end - nodeStart),
+          span.style,
+        ));
+        cursor = end;
+        if (span.end <= nodeEnd) {
+          next++;
+        } else {
+          break; // continues into the next node
+        }
+      }
+      if (cursor < nodeEnd) {
+        merged.add(_HighlightNode(
+          node.value.substring(cursor - nodeStart),
+          node.className,
+        ));
+      }
+      nodeStart = nodeEnd;
+    }
+    return merged;
   }
 
   TextSpan _buildSpanFromNodes(List<_HighlightNode> nodes, TextStyle baseStyle) {

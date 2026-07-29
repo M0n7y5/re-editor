@@ -24,6 +24,7 @@ class _CodeEditable extends StatefulWidget {
   final Color? bracketMatchColor;
   final Color? chunkIndicatorColor;
   final CodeDecorationController? decorations;
+  final CodeSemanticOverlayController? semanticOverlay;
   final double cursorWidth;
   final bool showCursorWhenReadOnly;
   final EdgeInsetsGeometry padding;
@@ -67,6 +68,7 @@ class _CodeEditable extends StatefulWidget {
     this.bracketMatchColor,
     this.chunkIndicatorColor,
     this.decorations,
+    this.semanticOverlay,
     required this.cursorWidth,
     required this.showCursorWhenReadOnly,
     required this.padding,
@@ -137,6 +139,7 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
       context: context,
       controller: widget.controller,
       theme: widget.codeTheme,
+      semanticOverlay: widget.semanticOverlay,
     );
 
     _codeIndicatorValueNotifier = CodeIndicatorValueNotifier(null);
@@ -173,6 +176,9 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
     }
     if (oldWidget.codeTheme != widget.codeTheme) {
       _highlighter.theme = widget.codeTheme;
+    }
+    if (!identical(oldWidget.semanticOverlay, widget.semanticOverlay)) {
+      _highlighter.semanticOverlay = widget.semanticOverlay;
     }
     super.didUpdateWidget(oldWidget);
   }

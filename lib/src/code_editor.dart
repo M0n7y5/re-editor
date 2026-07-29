@@ -191,6 +191,7 @@ class CodeEditor extends StatefulWidget {
     this.findController,
     this.toolbarController,
     this.decorations,
+    this.semanticOverlay,
     this.onChanged,
     this.style,
     this.hint,
@@ -236,6 +237,15 @@ class CodeEditor extends StatefulWidget {
   /// Mutating the controller repaints the decoration layer only, it neither
   /// relayouts nor re-highlights the code.
   final CodeDecorationController? decorations;
+
+  /// Holds the semantic (LSP) colour overlay merged over the grammar
+  /// highlighting.
+  ///
+  /// Where an overlay span covers a line, its style replaces the tree-sitter
+  /// style for exactly those code units — that is the merge policy: semantic
+  /// tokens win over the grammar layer for colour. Mutating the controller
+  /// repaints the text without re-running the grammar highlighter.
+  final CodeSemanticOverlayController? semanticOverlay;
 
   /// Called when the user initiates a change to the editor's
   /// value was changed, such as insertion or deletion.
@@ -534,6 +544,7 @@ class _CodeEditorState extends State<CodeEditor> {
       bracketMatchColor: widget.style?.bracketMatchColor,
       chunkIndicatorColor: widget.style?.chunkIndicatorColor,
       decorations: widget.decorations,
+      semanticOverlay: widget.semanticOverlay,
       cursorWidth: widget.style?.cursorWidth ?? _kDefaultCaretWidth,
       showCursorWhenReadOnly: widget.showCursorWhenReadOnly ?? true,
       sperator: widget.sperator,
