@@ -1663,6 +1663,17 @@ class _CodeDecorationPainter extends _CodeFieldExtraPainter {
           break;
         }
         final Offset delta = paragraph.offset - paintOffset;
+        if (_background && style.fullLine) {
+          // A full line tint ignores the glyph geometry: it spans the viewport
+          // from edge to edge, exactly like the cursor line border — see
+          // [_CodeCursorLinePainter]. One rect covers the paragraph's whole
+          // row, wrapped lines and empty lines included.
+          final Rect region = Rect.fromLTWH(0, delta.dy, size.width, paragraph.height);
+          if (region.bottom > 0 && region.top < size.height) {
+            canvas.drawRect(region, _paint);
+          }
+          continue;
+        }
         for (final Rect rect in _rangeRects(
           paragraph,
           paragraph.index == start.index ? start.offset : 0,

@@ -30,6 +30,7 @@ class CodeDecorationStyle {
     this.underlineColor,
     this.underlineThickness = 1.0,
     this.backgroundColor,
+    this.fullLine = false,
   }) : assert(underlineThickness > 0);
 
   /// The shape of the underline painted along the bottom of the range.
@@ -51,24 +52,36 @@ class CodeDecorationStyle {
   /// and below the text, a translucent color is usually what you want.
   final Color? backgroundColor;
 
+  /// Whether the tint spans the viewport from edge to edge instead of hugging
+  /// the glyphs of the range.
+  ///
+  /// The conventional rendering of a "current execution line" highlight: the
+  /// bar covers every covered line's full row — leading indent, trailing
+  /// emptiness and empty lines included — exactly like the cursor line
+  /// border. Only the [backgroundColor] tint is affected; an underline, if
+  /// any, still follows the glyphs.
+  final bool fullLine;
+
   /// Creates a copy of this style with the given fields replaced.
   CodeDecorationStyle copyWith({
     CodeDecorationUnderlineStyle? underline,
     Color? underlineColor,
     double? underlineThickness,
     Color? backgroundColor,
+    bool? fullLine,
   }) {
     return CodeDecorationStyle(
       underline: underline ?? this.underline,
       underlineColor: underlineColor ?? this.underlineColor,
       underlineThickness: underlineThickness ?? this.underlineThickness,
       backgroundColor: backgroundColor ?? this.backgroundColor,
+      fullLine: fullLine ?? this.fullLine,
     );
   }
 
   @override
-  int get hashCode =>
-      Object.hash(underline, underlineColor, underlineThickness, backgroundColor);
+  int get hashCode => Object.hash(
+      underline, underlineColor, underlineThickness, backgroundColor, fullLine);
 
   @override
   bool operator ==(Object other) {
@@ -79,13 +92,15 @@ class CodeDecorationStyle {
         other.underline == underline &&
         other.underlineColor == underlineColor &&
         other.underlineThickness == underlineThickness &&
-        other.backgroundColor == backgroundColor;
+        other.backgroundColor == backgroundColor &&
+        other.fullLine == fullLine;
   }
 
   @override
   String toString() =>
       'CodeDecorationStyle(underline: $underline, underlineColor: $underlineColor, '
-      'underlineThickness: $underlineThickness, backgroundColor: $backgroundColor)';
+      'underlineThickness: $underlineThickness, backgroundColor: $backgroundColor, '
+      'fullLine: $fullLine)';
 }
 
 /// A [style] painted over the code inside [range].
