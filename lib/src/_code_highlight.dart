@@ -380,16 +380,22 @@ class _CodeHighlightEngine {
 
   void run(CodeLines? codes, int firstLine, int lastLine,
       IsolateCallback<_HighlightResults> callback) {
-    if (_theme == null) {
+    final String? languageId = _theme?.languageId;
+    final Grammar? grammar = _theme?.grammars[languageId];
+    if (languageId == null || grammar == null) {
       callback(_HighlightResults.empty);
       return;
     }
-    _tasker.run(_HighlightPayload(codes, firstLine, lastLine), callback);
+    _tasker.run(
+      _HighlightPayload(codes, firstLine, lastLine, languageId, grammar),
+      callback,
+    );
   }
 
   @pragma('vm:entry-point')
   static _HighlightResults _run(_HighlightPayload payload) {
-    final DartHighlighter highlighter = _isoHighlighter ??= DartHighlighter();
+    final Highlighter highlighter = _isoHighlighters[payload.languageId] ??=
+        Highlighter(payload.grammar);
     final CodeLines? codes = payload.codes;
     if (codes != null) {
       highlighter.update(codes.asString(TextLineBreak.lf, false));
@@ -410,15 +416,19 @@ class _HighlightPayload {
   final CodeLines? codes;
   final int firstLine;
   final int lastLine;
+  final String languageId;
+  final Grammar grammar;
 
-  const _HighlightPayload(this.codes, this.firstLine, this.lastLine);
+  const _HighlightPayload(this.codes, this.firstLine, this.lastLine,
+      this.languageId, this.grammar);
 
 }
 
-/// The tree-sitter highlighter, lazily created inside (and owned by) the
-/// highlight worker isolate. The engine keeps a single persistent worker, so
-/// the parser + compiled query are built once and reused across runs.
-DartHighlighter? _isoHighlighter;
+/// The tree-sitter highlighters by language id, lazily created inside (and
+/// owned by) the highlight worker isolate. The engine keeps a single persistent
+/// worker, so each language's parser + compiled query are built once and
+/// reused across runs, including when the editor switches language and back.
+final Map<String, Highlighter> _isoHighlighters = <String, Highlighter>{};
 
 /// Converts one line's [ranges] into a full-coverage [_HighlightResult]: gap
 /// nodes (no class) fill the unstyled stretches so the node values concatenate

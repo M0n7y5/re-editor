@@ -11,6 +11,8 @@ class CodeHighlightTheme {
     this.languages = const {},
     required this.theme,
     this.plugins = const [],
+    this.languageId,
+    this.grammars = const {},
   });
 
   /// Supported syntax highlighting language rules.
@@ -22,8 +24,20 @@ class CodeHighlightTheme {
   /// The plugins for syntax highlighting.
   final List<HLPlugin> plugins;
 
+  /// The edited document's language: the key into [grammars] the highlight
+  /// worker parses with. Null, or an id [grammars] lacks, renders plain text.
+  ///
+  /// It rides on the theme because the theme is already the per-document
+  /// highlight config the editor hands its worker, and a changed theme already
+  /// re-ships the document. [grammars] is the app's whole registry, so
+  /// re_editor never names a grammar itself.
+  final String? languageId;
+
+  /// The tree-sitter grammars the application ships, by language id.
+  final Map<String, Grammar> grammars;
+
   @override
-  int get hashCode => Object.hash(languages, theme, plugins);
+  int get hashCode => Object.hash(languages, theme, plugins, languageId, grammars);
 
   @override
   bool operator ==(Object other) {
@@ -33,7 +47,9 @@ class CodeHighlightTheme {
     return other is CodeHighlightTheme
         && mapEquals(other.languages, languages)
         && mapEquals(other.theme, theme)
-        && listEquals(other.plugins, plugins);
+        && listEquals(other.plugins, plugins)
+        && other.languageId == languageId
+        && mapEquals(other.grammars, grammars);
   }
 
 }

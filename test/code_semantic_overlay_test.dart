@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nok_tree_sitter/nok_tree_sitter.dart' show Grammar, dartGrammar;
 import 'package:re_editor/re_editor.dart';
 
 /// The semantic overlay ([CodeSemanticOverlayController]) is the editor's
@@ -28,6 +29,8 @@ void main() {
       'parameter': TextStyle(color: parameterColor),
       'enumMember': TextStyle(color: memberColor),
     },
+    languageId: 'dart',
+    grammars: <String, Grammar>{'dart': dartGrammar},
   );
 
   /// Two byte-identical body lines, which is what the aliasing test needs, and
