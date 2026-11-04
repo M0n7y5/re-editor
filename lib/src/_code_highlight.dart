@@ -381,13 +381,16 @@ class _CodeHighlightEngine {
   void run(CodeLines? codes, int firstLine, int lastLine,
       IsolateCallback<_HighlightResults> callback) {
     final String? languageId = _theme?.languageId;
-    final Grammar? grammar = _theme?.grammars[languageId];
+    final Map<String, Grammar> grammars =
+        _theme?.grammars ?? const <String, Grammar>{};
+    final Grammar? grammar = grammars[languageId];
     if (languageId == null || grammar == null) {
       callback(_HighlightResults.empty);
       return;
     }
     _tasker.run(
-      _HighlightPayload(codes, firstLine, lastLine, languageId, grammar),
+      _HighlightPayload(
+          codes, firstLine, lastLine, languageId, grammar, grammars),
       callback,
     );
   }
@@ -395,7 +398,7 @@ class _CodeHighlightEngine {
   @pragma('vm:entry-point')
   static _HighlightResults _run(_HighlightPayload payload) {
     final Highlighter highlighter = _isoHighlighters[payload.languageId] ??=
-        Highlighter(payload.grammar);
+        Highlighter(payload.grammar, grammars: payload.grammars);
     final CodeLines? codes = payload.codes;
     if (codes != null) {
       highlighter.update(codes.asString(TextLineBreak.lf, false));
@@ -418,9 +421,12 @@ class _HighlightPayload {
   final int lastLine;
   final String languageId;
   final Grammar grammar;
+  /// Every grammar the editor knows, so [grammar]'s injections can resolve
+  /// the languages they name.
+  final Map<String, Grammar> grammars;
 
   const _HighlightPayload(this.codes, this.firstLine, this.lastLine,
-      this.languageId, this.grammar);
+      this.languageId, this.grammar, this.grammars);
 
 }
 
