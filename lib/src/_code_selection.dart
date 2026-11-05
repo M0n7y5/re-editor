@@ -315,6 +315,11 @@ class _CodeSelectionGestureDetectorState extends State<_CodeSelectionGestureDete
       return;
     }
     widget.controller.clearComposing();
+    // A right-click outside the selection puts the caret there first, so the
+    // menu acts on what was clicked; one inside keeps the selection.
+    if (!_isMobile && !_isPositionOnSelection(details.globalPosition)) {
+      _selectPosition(details.globalPosition, _SelectionChangedCause.tapDown);
+    }
     widget.selectionOverlayController.showToolbar(context, details.globalPosition);
   }
 
