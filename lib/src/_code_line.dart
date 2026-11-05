@@ -688,12 +688,61 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
 
   @override
   void moveCursorToPageUp() {
-    // TODO
+    if (!_multiCaretActive &&
+        _runForAllCarets(moveCursorToPageUp, revocable: false)) {
+      return;
+    }
+    _movePage(down: false, extend: false);
   }
 
   @override
   void moveCursorToPageDown() {
-    // TODO
+    if (!_multiCaretActive &&
+        _runForAllCarets(moveCursorToPageDown, revocable: false)) {
+      return;
+    }
+    _movePage(down: true, extend: false);
+  }
+
+  /// Moves the caret (or the selection's extent when [extend]) by one
+  /// viewport of rows, keeping its column, and scrolls the viewport by the
+  /// same so the caret keeps its screen row, as VSCode does. A row is an
+  /// entry of [codeLines] (a folded chunk is inside its row), so the step is
+  /// over what is shown; soft-wrapped rows count as one.
+  void _movePage({required bool down, required bool extend}) {
+    final _CodeFieldRender? render = _render;
+    final int rows = render == null || !render.hasSize
+        ? 1
+        : max(1, (render.size.height / render.lineHeight).floor());
+    final CodeLinePosition from = extend
+        ? selection.extent
+        : (down ? selection.end : selection.start);
+    final int index = (from.index + (down ? rows : -rows)).clamp(
+      0,
+      codeLines.length - 1,
+    );
+    final CodeLinePosition position = CodeLinePosition(
+      index: index,
+      offset: min(codeLines[index].length, from.offset),
+    );
+    selection = extend
+        ? selection.copyWith(
+            extentIndex: position.index,
+            extentOffset: position.offset,
+            extentAffinity: position.affinity,
+          )
+        : CodeLineSelection.fromPosition(position: position);
+    final ViewportOffset? viewport = render?._verticalViewport;
+    if (viewport is ScrollPosition && viewport.hasContentDimensions) {
+      final double delta = rows * render!.lineHeight * (down ? 1 : -1);
+      viewport.jumpTo(
+        (viewport.pixels + delta).clamp(
+          viewport.minScrollExtent,
+          viewport.maxScrollExtent,
+        ),
+      );
+    }
+    makeCursorVisible();
   }
 
   @override
@@ -950,6 +999,24 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   void extendSelectionToPageStart() {
     selection = selection.copyWith(extentIndex: 0, extentOffset: 0);
     makeCursorVisible();
+  }
+
+  @override
+  void extendSelectionToPageUp() {
+    if (!_multiCaretActive &&
+        _runForAllCarets(extendSelectionToPageUp, revocable: false)) {
+      return;
+    }
+    _movePage(down: false, extend: true);
+  }
+
+  @override
+  void extendSelectionToPageDown() {
+    if (!_multiCaretActive &&
+        _runForAllCarets(extendSelectionToPageDown, revocable: false)) {
+      return;
+    }
+    _movePage(down: true, extend: true);
   }
 
   @override
@@ -3029,6 +3096,16 @@ class _CodeLineEditingControllerDelegate implements CodeLineEditingController {
   @override
   void extendSelectionToPageEnd() {
     _delegate.extendSelectionToPageEnd();
+  }
+
+  @override
+  void extendSelectionToPageUp() {
+    _delegate.extendSelectionToPageUp();
+  }
+
+  @override
+  void extendSelectionToPageDown() {
+    _delegate.extendSelectionToPageDown();
   }
 
   @override

@@ -211,6 +211,13 @@ class _CodeShortcutActions extends StatelessWidget {
         actions.editingController.moveCursorToPageUp();
       }
     },
+    CodeShortcutSelectionExtendPageIntent: (intent, actions) {
+      if ((intent as CodeShortcutSelectionExtendPageIntent).forward) {
+        actions.editingController.extendSelectionToPageDown();
+      } else {
+        actions.editingController.extendSelectionToPageUp();
+      }
+    },
     CodeShortcutCursorMoveWordBoundaryIntent: (intent, actions) {
       if ((intent as CodeShortcutCursorMoveWordBoundaryIntent).forward) {
         actions.editingController.moveCursorToWordBoundaryForward();

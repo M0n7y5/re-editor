@@ -255,10 +255,10 @@ abstract class CodeLineEditingController
   /// Move the cursor to the end of document.
   void moveCursorToPageEnd();
 
-  /// TODO
+  /// Move the cursor up by one viewport of rows, keeping its column.
   void moveCursorToPageUp();
 
-  /// TODO
+  /// Move the cursor down by one viewport of rows, keeping its column.
   void moveCursorToPageDown();
 
   /// Move the cursor to the start of the word.
@@ -281,6 +281,12 @@ abstract class CodeLineEditingController
 
   /// Extend the selection to the end of document.
   void extendSelectionToPageEnd();
+
+  /// Extend the selection up by one viewport of rows.
+  void extendSelectionToPageUp();
+
+  /// Extend the selection down by one viewport of rows.
+  void extendSelectionToPageDown();
 
   /// Extend the selection to the start of the word.
   void extendSelectionToWordBoundaryForward();

@@ -37,6 +37,8 @@ enum CodeShortcutType {
   selectionExtendLineEnd,
   selectionExtendPageStart,
   selectionExtendPageEnd,
+  selectionExtendPageUp,
+  selectionExtendPageDown,
   selectionExtendWordBoundaryForward,
   selectionExtendWordBoundaryBackward,
   wordDeleteForward,
@@ -163,6 +165,11 @@ class CodeShortcutCursorMovePageIntent extends Intent {
   const CodeShortcutCursorMovePageIntent(this.forward);
 }
 
+class CodeShortcutSelectionExtendPageIntent extends Intent {
+  final bool forward;
+  const CodeShortcutSelectionExtendPageIntent(this.forward);
+}
+
 class CodeShortcutCursorMoveWordBoundaryIntent extends Intent {
   final bool forward;
   const CodeShortcutCursorMoveWordBoundaryIntent(this.forward);
@@ -280,6 +287,8 @@ const Map<CodeShortcutType, Intent> kCodeShortcutIntents = {
   CodeShortcutType.selectionExtendLineEnd: CodeShortcutSelectionExtendLineEdgeIntent(true),
   CodeShortcutType.selectionExtendPageStart: CodeShortcutSelectionExtendPageEdgeIntent(false),
   CodeShortcutType.selectionExtendPageEnd: CodeShortcutSelectionExtendPageEdgeIntent(true),
+  CodeShortcutType.selectionExtendPageUp: CodeShortcutSelectionExtendPageIntent(false),
+  CodeShortcutType.selectionExtendPageDown: CodeShortcutSelectionExtendPageIntent(true),
   CodeShortcutType.selectionExtendWordBoundaryForward: CodeShortcutSelectionExtendWordBoundaryIntent(true),
   CodeShortcutType.selectionExtendWordBoundaryBackward: CodeShortcutSelectionExtendWordBoundaryIntent(false),
   CodeShortcutType.wordDeleteForward: ShortcutWordDeleteDirectionIntent(true),
@@ -403,6 +412,12 @@ const Map<CodeShortcutType, List<ShortcutActivator>> _kDefaultMacCodeShortcutsAc
   ],
   CodeShortcutType.cursorMovePageDown: [
     SingleActivator(LogicalKeyboardKey.pageDown)
+  ],
+  CodeShortcutType.selectionExtendPageUp: [
+    SingleActivator(LogicalKeyboardKey.pageUp, shift: true)
+  ],
+  CodeShortcutType.selectionExtendPageDown: [
+    SingleActivator(LogicalKeyboardKey.pageDown, shift: true)
   ],
   CodeShortcutType.cursorMoveWordBoundaryBackward: [
     SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true)
@@ -595,6 +610,12 @@ const Map<CodeShortcutType, List<ShortcutActivator>> _kDefaultCommonCodeShortcut
   ],
   CodeShortcutType.cursorMovePageDown: [
     SingleActivator(LogicalKeyboardKey.pageDown)
+  ],
+  CodeShortcutType.selectionExtendPageUp: [
+    SingleActivator(LogicalKeyboardKey.pageUp, shift: true)
+  ],
+  CodeShortcutType.selectionExtendPageDown: [
+    SingleActivator(LogicalKeyboardKey.pageDown, shift: true)
   ],
   CodeShortcutType.cursorMoveWordBoundaryBackward: [
     SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true)
