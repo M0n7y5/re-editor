@@ -1,7 +1,7 @@
 part of re_editor;
 
-class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements CodeFindController {
-
+class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?>
+    implements CodeFindController {
   late final CodeLineEditingController _controller;
   late final _IsolateTasker<_CodeFindPayload, CodeFindResult?> _tasker;
   late final TextEditingController _findInputController;
@@ -11,10 +11,18 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
   late bool _shouldNotUpdateResults;
   late bool _replacingMatch;
 
-  _CodeFindControllerImpl(CodeLineEditingController controller, [CodeFindValue? value]) : super(value) {
-    _controller = controller is _CodeLineEditingControllerDelegate ? controller.delegate : controller;
+  _CodeFindControllerImpl(
+    CodeLineEditingController controller, [
+    CodeFindValue? value,
+  ]) : super(value) {
+    _controller = controller is _CodeLineEditingControllerDelegate
+        ? controller.delegate
+        : controller;
     _controller.addListener(_updateResult);
-    _tasker = _IsolateTasker<_CodeFindPayload, CodeFindResult?>('CodeFind', _run);
+    _tasker = _IsolateTasker<_CodeFindPayload, CodeFindResult?>(
+      'CodeFind',
+      _run,
+    );
     _findInputController = TextEditingController();
     _findInputController.addListener(_onFindPatternChanged);
     _findInputFocusNode = FocusNode();
@@ -91,23 +99,21 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
         text: autoFilled,
         selection: TextSelection(
           baseOffset: 0,
-          extentOffset: autoFilled.length
-        )
+          extentOffset: autoFilled.length,
+        ),
       );
     } else {
       _findInputController.selection = TextSelection(
         baseOffset: 0,
-        extentOffset: _findInputController.text.length
+        extentOffset: _findInputController.text.length,
       );
     }
     _findInputController.addListener(_onFindPatternChanged);
     final CodeFindValue preValue = value ?? const CodeFindValue.empty();
     value = preValue.copyWith(
-      option: preValue.option.copyWith(
-        pattern: _findInputController.text
-      ),
+      option: preValue.option.copyWith(pattern: _findInputController.text),
       result: null,
-      searching: true
+      searching: true,
     );
     _updateResult();
   }
@@ -122,24 +128,22 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
         text: autoFilled,
         selection: TextSelection(
           baseOffset: 0,
-          extentOffset: autoFilled.length
-        )
+          extentOffset: autoFilled.length,
+        ),
       );
     } else {
       _findInputController.selection = TextSelection(
         baseOffset: 0,
-        extentOffset: _findInputController.text.length
+        extentOffset: _findInputController.text.length,
       );
     }
     _findInputController.addListener(_onFindPatternChanged);
     final CodeFindValue preValue = value ?? const CodeFindValue.empty();
     value = preValue.copyWith(
-      option: preValue.option.copyWith(
-        pattern: _findInputController.text,
-      ),
+      option: preValue.option.copyWith(pattern: _findInputController.text),
       replaceMode: true,
       result: null,
-      searching: true
+      searching: true,
     );
     _updateResult();
   }
@@ -149,7 +153,7 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
     _findInputFocusNode.requestFocus();
     _findInputController.selection = TextSelection(
       baseOffset: 0,
-      extentOffset: _findInputController.text.length
+      extentOffset: _findInputController.text.length,
     );
   }
 
@@ -158,7 +162,7 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
     _replaceInputFocusNode.requestFocus();
     _replaceInputController.selection = TextSelection(
       baseOffset: 0,
-      extentOffset: _replaceInputController.text.length
+      extentOffset: _replaceInputController.text.length,
     );
   }
 
@@ -170,7 +174,7 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
     }
     value = preValue.copyWith(
       replaceMode: !preValue.replaceMode,
-      result: preValue.result
+      result: preValue.result,
     );
   }
 
@@ -186,11 +190,9 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
       return;
     }
     value = value?.copyWith(
-      option: option.copyWith(
-        regex: !option.regex,
-      ),
+      option: option.copyWith(regex: !option.regex),
       result: null,
-      searching: true
+      searching: true,
     );
     _updateResult();
   }
@@ -202,11 +204,47 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
       return;
     }
     value = value?.copyWith(
-      option: option.copyWith(
-        caseSensitive: !option.caseSensitive,
-      ),
+      option: option.copyWith(caseSensitive: !option.caseSensitive),
       result: null,
-      searching: true
+      searching: true,
+    );
+    _updateResult();
+  }
+
+  @override
+  void toggleWholeWord() {
+    final CodeFindOption? option = value?.option;
+    if (option == null) {
+      return;
+    }
+    value = value?.copyWith(
+      option: option.copyWith(wholeWord: !option.wholeWord),
+      result: null,
+      searching: true,
+    );
+    _updateResult();
+  }
+
+  @override
+  void toggleInSelection() {
+    final CodeFindOption? option = value?.option;
+    if (option == null) {
+      return;
+    }
+    final CodeLineSelection? range;
+    if (option.inSelection) {
+      range = null;
+    } else {
+      final CodeLineSelection selection = _controller.unfoldLineSelection;
+      if (selection.isCollapsed) {
+        return;
+      }
+      range = selection;
+    }
+    value = value?.copyWith(
+      option: option.copyWith(range: range, clearRange: range == null),
+      result: null,
+      searching: true,
     );
     _updateResult();
   }
@@ -217,9 +255,7 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
     if (result == null || result.dirty) {
       return;
     }
-    final CodeFindValue newValue = value!.copyWith(
-      result: result.previous
-    );
+    final CodeFindValue newValue = value!.copyWith(result: result.previous);
     _expandChunkIfNeeded(newValue);
     value = newValue;
     if (result.matches.length == 1) {
@@ -236,9 +272,7 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
     if (result == null || result.dirty) {
       return;
     }
-    final CodeFindValue newValue = value!.copyWith(
-      result: result.next
-    );
+    final CodeFindValue newValue = value!.copyWith(result: result.next);
     _expandChunkIfNeeded(newValue);
     value = newValue;
     if (result.matches.length == 1) {
@@ -264,11 +298,14 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
     }
     _replacingMatch = true;
     final CodeLines preCodeLines = _controller.codeLines;
-    _controller.replaceSelection(_replaceInputController.text, selection);
+    _controller.replaceSelection(
+      _replacementFor(result.currentMatch!, _replaceInputController.text),
+      selection,
+    );
     final CodeFindValue newValue = value!.copyWith(
       result: result.next.copyWith(
-        dirty: !preCodeLines.equals(_controller.codeLines)
-      )
+        dirty: !preCodeLines.equals(_controller.codeLines),
+      ),
     );
     _expandChunkIfNeeded(newValue);
     value = newValue;
@@ -291,18 +328,25 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
     }
     _replacingMatch = true;
     final CodeLines preCodeLine = _controller.codeLines;
-    _controller.replaceAll(regExp, _replaceInputController.text);
+    _controller.replaceAll(
+      regExp,
+      _replaceInputController.text,
+      expandGroups: option.regex,
+      range: option.range,
+    );
     value = value?.copyWith(
       result: result.copyWith(
-        dirty: !preCodeLine.equals(_controller.codeLines)
-      )
+        dirty: !preCodeLine.equals(_controller.codeLines),
+      ),
     );
     _replacingMatch = false;
   }
 
   @override
   CodeLineSelection? convertMatchToSelection(CodeLineSelection match) {
-    final CodeLineIndex baseIndex = _controller.lineIndex2Index(match.baseIndex);
+    final CodeLineIndex baseIndex = _controller.lineIndex2Index(
+      match.baseIndex,
+    );
     if (baseIndex.chunkIndex >= 0) {
       // This match is in a collapsed chunk, invisble
       return null;
@@ -319,7 +363,7 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
     }
     return match.copyWith(
       baseIndex: baseIndex.index,
-      extentIndex: extentIndex.index
+      extentIndex: extentIndex.index,
     );
   }
 
@@ -332,13 +376,38 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
       return;
     }
     value = value?.copyWith(
-      option: option.copyWith(
-        pattern: _findInputController.text,
-      ),
+      option: option.copyWith(pattern: _findInputController.text),
       result: null,
-      searching: true
+      searching: true,
     );
     _updateResult();
+  }
+
+  /// [replacement] with `$1`..`$9` and `$0` expanded from [match]'s groups
+  /// under a regex search; literal otherwise, as VSCode does.
+  String _replacementFor(CodeLineSelection match, String replacement) {
+    final CodeFindOption option = value!.option;
+    final RegExp? regExp = option.regExp;
+    if (!option.regex || regExp == null) {
+      return replacement;
+    }
+    final List<String> lines = _controller.codeLines.toList().fold(
+      <String>[],
+      (List<String> acc, CodeLine line) => acc..addAll(line.flat()),
+    );
+    final String matched = match.isSameLine
+        ? lines[match.startIndex].substring(match.startOffset, match.endOffset)
+        : <String>[
+            lines[match.startIndex].substring(match.startOffset),
+            for (int i = match.startIndex + 1; i < match.endIndex; i++)
+              lines[i],
+            lines[match.endIndex].substring(0, match.endOffset),
+          ].join(TextLineBreak.lf.value);
+    final Match? m = regExp.firstMatch(matched);
+    if (m == null) {
+      return replacement;
+    }
+    return expandMatchGroups(replacement, m);
   }
 
   String? _autoFilledPattern() {
@@ -355,41 +424,33 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
     }
     final CodeFindOption? option = value?.option;
     if (option == null || option.pattern.isEmpty) {
-      value = value?.copyWith(
-        result: null,
-        searching: false
-      );
+      value = value?.copyWith(result: null, searching: false);
       return;
     }
     final bool optionChanged = value?.result?.option != option;
-    if (!optionChanged && _controller.codeLines.equals(value?.result?.codeLines)) {
-      value = value?.copyWith(
-        result: value?.result,
-        searching: false
-      );
+    if (!optionChanged &&
+        _controller.codeLines.equals(value?.result?.codeLines)) {
+      value = value?.copyWith(result: value?.result, searching: false);
       return;
     }
     final _CodeFindPayload payload = _CodeFindPayload(
       codeLines: _controller.codeLines,
       selection: _controller.unfoldLineSelection,
       option: option,
-      forwardMatch: !_replacingMatch
+      forwardMatch: !_replacingMatch,
     );
     _tasker.run(payload, (result) {
       if (option == value?.option) {
         final CodeFindValue newValue = value!.copyWith(
           result: result,
-          searching: false
+          searching: false,
         );
         if (optionChanged) {
           _expandChunkIfNeeded(newValue);
         }
         value = newValue;
       } else {
-        value = value?.copyWith(
-          result: null,
-          searching: false
-        );
+        value = value?.copyWith(result: null, searching: false);
       }
     });
   }
@@ -431,24 +492,37 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
     if (regExp == null) {
       return null;
     }
-    final List<String> rawCodeLines = payload.codeLines.toList().fold([], (previousValue, element) {
+    final List<String> rawCodeLines = payload.codeLines.toList().fold([], (
+      previousValue,
+      element,
+    ) {
       previousValue.addAll(element.flat());
       return previousValue;
     });
-    final Iterable<Match> matches = regExp.allMatches(rawCodeLines.join(TextLineBreak.lf.value));
+    final Iterable<Match> matches = regExp.allMatches(
+      rawCodeLines.join(TextLineBreak.lf.value),
+    );
     if (matches.isEmpty) {
       return null;
     }
+    final CodeLineSelection? range = payload.option.range;
     final List<CodeLineSelection> selections = [];
     for (final Match match in matches) {
       final CodeLinePosition start = _findPosition(rawCodeLines, match.start);
       final CodeLinePosition end = _findPosition(rawCodeLines, match.end);
-      selections.add(CodeLineSelection(
+      final CodeLineSelection selection = CodeLineSelection(
         baseIndex: start.index,
         baseOffset: start.offset,
         extentIndex: end.index,
-        extentOffset: end.offset
-      ));
+        extentOffset: end.offset,
+      );
+      if (range != null && !range.contains(selection)) {
+        continue;
+      }
+      selections.add(selection);
+    }
+    if (selections.isEmpty) {
+      return null;
     }
     int index;
     if (payload.forwardMatch) {
@@ -461,7 +535,7 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
           break;
         }
         if (selections[index].endIndex == payload.selection.startIndex &&
-          selections[index].endOffset <= payload.selection.startOffset) {
+            selections[index].endOffset <= payload.selection.startOffset) {
           break;
         }
       }
@@ -475,7 +549,7 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
           break;
         }
         if (selections[index].startIndex == payload.selection.endIndex &&
-          selections[index].startOffset >= payload.selection.endOffset) {
+            selections[index].startOffset >= payload.selection.endOffset) {
           break;
         }
       }
@@ -485,7 +559,7 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
       matches: selections,
       option: payload.option,
       codeLines: payload.codeLines,
-      dirty: false
+      dirty: false,
     );
   }
 
@@ -500,16 +574,11 @@ class _CodeFindControllerImpl extends ValueNotifier<CodeFindValue?> implements C
       }
       start += codeLines[line].length + 1;
     }
-    return CodeLinePosition(
-      index: line,
-      offset: offset
-    );
+    return CodeLinePosition(index: line, offset: offset);
   }
-
 }
 
 class _CodeFindPayload {
-
   final CodeLines codeLines;
   final CodeLineSelection selection;
   final CodeFindOption option;
@@ -521,5 +590,31 @@ class _CodeFindPayload {
     required this.option,
     required this.forwardMatch,
   });
+}
 
+/// [replacement] with `$0` (the whole match) and `$1`..`$9` replaced by
+/// [match]'s groups, a missing group by nothing, and `$$` by one `$`.
+String expandMatchGroups(String replacement, Match match) {
+  final StringBuffer sb = StringBuffer();
+  for (int i = 0; i < replacement.length; i++) {
+    final String c = replacement[i];
+    if (c != r'$' || i + 1 >= replacement.length) {
+      sb.write(c);
+      continue;
+    }
+    final String next = replacement[i + 1];
+    if (next == r'$') {
+      sb.write(r'$');
+      i++;
+    } else if (next.codeUnitAt(0) >= 0x30 && next.codeUnitAt(0) <= 0x39) {
+      final int group = next.codeUnitAt(0) - 0x30;
+      if (group <= match.groupCount) {
+        sb.write(match.group(group) ?? '');
+      }
+      i++;
+    } else {
+      sb.write(c);
+    }
+  }
+  return sb.toString();
 }

@@ -343,8 +343,16 @@ abstract class CodeLineEditingController
   /// Replace the selected code with a new string [replacement].
   void replaceSelection(String replacement, [CodeLineSelection? selection]);
 
-  /// Replaces all substrings that match [pattern] with [replacement].
-  void replaceAll(Pattern pattern, String replacement);
+  /// Replaces all substrings that match [pattern] with [replacement]. With
+  /// [expandGroups], `$0`..`$9` in [replacement] stand for the match's
+  /// groups (and `$$` for `$`). [range], in unfolded line coordinates like
+  /// [unfoldLineSelection], limits the replacement to matches inside it.
+  void replaceAll(
+    Pattern pattern,
+    String replacement, {
+    bool expandGroups = false,
+    CodeLineSelection? range,
+  });
 
   /// Reverts the value on the stack to the previous value.
   void undo();

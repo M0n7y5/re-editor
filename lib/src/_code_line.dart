@@ -1272,9 +1272,19 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   }
 
   @override
-  void replaceAll(Pattern pattern, String replacement) {
+  void replaceAll(
+    Pattern pattern,
+    String replacement, {
+    bool expandGroups = false,
+    CodeLineSelection? range,
+  }) {
     runRevocableOp(() {
-      _replaceAll(pattern, replacement);
+      _replaceAll(
+        pattern,
+        replacement,
+        expandGroups: expandGroups,
+        range: range,
+      );
     });
   }
 
@@ -2553,7 +2563,12 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     makeCursorCenterIfInvisible();
   }
 
-  void _replaceAll(Pattern pattern, String replacement) {
+  void _replaceAll(
+    Pattern pattern,
+    String replacement, {
+    bool expandGroups = false,
+    CodeLineSelection? range,
+  }) {
     if (pattern is String && pattern.isEmpty) {
       return;
     }
@@ -2562,12 +2577,37 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
       extentOffset += codeLines[i].charCount + lineBreak.value.length;
     }
     final String preText = text;
+    // [range] is in unfolded lines; [text] is the unfolded document, so its
+    // character offsets come from the same flat lines.
+    int rangeStart = 0;
+    int rangeEnd = preText.length;
+    if (range != null) {
+      final List<String> flat = codeLines.toList().fold(
+        <String>[],
+        (List<String> acc, CodeLine line) => acc..addAll(line.flat()),
+      );
+      int offsetOf(int line, int column) {
+        int offset = 0;
+        for (int i = 0; i < line && i < flat.length; i++) {
+          offset += flat[i].length + lineBreak.value.length;
+        }
+        return offset + column;
+      }
+      rangeStart = offsetOf(range.startIndex, range.startOffset);
+      rangeEnd = offsetOf(range.endIndex, range.endOffset);
+    }
     int delta = 0;
     final String newText = text.replaceAllMapped(pattern, (match) {
-      if (match.end <= extentOffset) {
-        delta += replacement.length - (match.end - match.start);
+      if (match.start < rangeStart || match.end > rangeEnd) {
+        return match[0]!;
       }
-      return replacement;
+      final String replaced = expandGroups
+          ? expandMatchGroups(replacement, match)
+          : replacement;
+      if (match.end <= extentOffset) {
+        delta += replaced.length - (match.end - match.start);
+      }
+      return replaced;
     });
     if (preText == newText) {
       return;
@@ -3277,8 +3317,18 @@ class _CodeLineEditingControllerDelegate implements CodeLineEditingController {
   }
 
   @override
-  void replaceAll(Pattern pattern, String replacement) {
-    _delegate.replaceAll(pattern, replacement);
+  void replaceAll(
+    Pattern pattern,
+    String replacement, {
+    bool expandGroups = false,
+    CodeLineSelection? range,
+  }) {
+    _delegate.replaceAll(
+      pattern,
+      replacement,
+      expandGroups: expandGroups,
+      range: range,
+    );
   }
 
   @override
