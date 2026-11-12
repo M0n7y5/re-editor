@@ -12,6 +12,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  material_ui: ^1.11.0
+  cupertino_ui: ^1.1.6
   re_highlight: ^0.0.3
   isolate_manager: ^6.3.2
   nok_tree_sitter:

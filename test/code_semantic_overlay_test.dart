@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nok_tree_sitter/nok_tree_sitter.dart' show Grammar, dartGrammar;
 import 'package:re_editor/re_editor.dart';
