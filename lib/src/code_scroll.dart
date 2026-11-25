@@ -29,6 +29,12 @@ class CodeScrollController {
 
   _CodeFieldRender? get _render => _editorKey?.currentContext?.findRenderObject() as _CodeFieldRender?;
 
+  /// The height of one row, null while no editor is laid out.
+  double? get lineHeight => _render?.lineHeight;
+
+  /// The gap above the first row, null while no editor is laid out.
+  double? get paddingTop => _render?.paddingTop;
+
   void dispose() {
     _editorKey = null;
   }
